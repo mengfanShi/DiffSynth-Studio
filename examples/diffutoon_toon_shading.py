@@ -90,5 +90,7 @@ config = {
     }
 }
 
-runner = SDVideoPipelineRunner()
-runner.run(config)
+
+if __name__ == "__main__":
+    runner = SDVideoPipelineRunner()
+    runner.run(config)

@@ -1,4 +1,4 @@
-name: DiffSynthStudio
+name: diffutoon
 channels:
   - pytorch
   - nvidia

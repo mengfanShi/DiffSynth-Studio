@@ -181,16 +181,17 @@ config_stage_2 = {
 }
 
 
-runner = SDVideoPipelineRunner()
-runner.run(config_stage_1)
+if __name__ == "__main__":
+    runner = SDVideoPipelineRunner()
+    runner.run(config_stage_1)
 
-# Replace the color video with the synthesized video
-config_stage_2["data"]["controlnet_frames"][0] = {
-    "video_file": os.path.join(config_stage_1["data"]["output_folder"], "video.mp4"),
-    "image_folder": None,
-    "height": config_stage_2["data"]["input_frames"]["height"],
-    "width": config_stage_2["data"]["input_frames"]["width"],
-    "start_frame_id": None,
-    "end_frame_id": None
-}
-runner.run(config_stage_2)
+    # Replace the color video with the synthesized video
+    config_stage_2["data"]["controlnet_frames"][0] = {
+        "video_file": os.path.join(config_stage_1["data"]["output_folder"], "video.mp4"),
+        "image_folder": None,
+        "height": config_stage_2["data"]["input_frames"]["height"],
+        "width": config_stage_2["data"]["input_frames"]["width"],
+        "start_frame_id": None,
+        "end_frame_id": None
+    }
+    runner.run(config_stage_2)
