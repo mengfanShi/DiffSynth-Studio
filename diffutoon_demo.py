@@ -1,4 +1,4 @@
-from examples.diffutoon_toon_shading import config
+from examples.Diffutoon.diffutoon_toon_shading import config
 from diffsynth import SDVideoPipelineRunner
 import argparse
 import datetime
