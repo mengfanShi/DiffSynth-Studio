@@ -11,18 +11,22 @@ def parse_args():
 
     parser.add_argument("--video_path", type=str, required=True, help="Path to the input video file.")
     parser.add_argument("--prompt", type=str, required=True, help="Prompt for the pipeline.")
-    parser.add_argument("--height", type=int, default=1024, help="Height of the input video frames.")
-    parser.add_argument("--width", type=int, default=1024, help="Width of the input video frames.")
+    parser.add_argument("--height", type=int, default=1024, help="Height of the input video frames, multiple of 64.")
+    parser.add_argument("--width", type=int, default=1024, help="Width of the input video frames, multiple of 64.")
     parser.add_argument("--device", type=str, default="cuda", help="Device to run the pipeline on (e.g., 'cuda', 'cpu').")
     parser.add_argument("--start_frame_id", type=int, default=0, help="Starting frame ID for processing.")
     parser.add_argument("--end_frame_id", type=int, default=30, help="Ending frame ID for processing.")
     parser.add_argument("--total_video", action="store_true", help="whether process total video.")
+    parser.add_argument("--origin_size", action="store_true", help="whether output origin size of input video.")
     parser.add_argument("--output_folder", type=str, default="data/toon_video", help="Folder to save the output frames.")
     parser.add_argument("--steps", type=int, default=10, help="Number of inference steps.")
     parser.add_argument("--seed", type=int, default=0, help="seed of generate video.")
+    parser.add_argument("--cfg_scale", type=float, default=7.0, help="cfg_scale.")
     parser.add_argument("--fps", type=int, default=30, help="fps of generate video.")
     parser.add_argument("--model_path", type=str, default="models/stable_diffusion/aingdiffusion_v12.safetensors",
                         help="Stable Diffusion model path.")
+    parser.add_argument("--animatediff", type=str, default="models/AnimateDiff/mm_sd_v15_v2.ckpt",
+                        help="Animatediff model path.")
 
     args = parser.parse_args()
     return args
@@ -40,21 +44,34 @@ if __name__ == "__main__":
         if os.path.isfile(args.model_path):
             demo_config["models"]["model_list"][0] = args.model_path
 
+        if os.path.isfile(args.animatediff):
+            demo_config["models"]["model_list"][1] = args.animatediff
+
+        start_frame_id = args.start_frame_id
         end_frame_id = args.end_frame_id
         fps = args.fps
         if args.total_video:
             cap = cv2.VideoCapture(args.video_path)
+            start_frame_id = 0
             end_frame_id = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
             fps = int(cap.get(cv2.CAP_PROP_FPS))
             cap.release()
+
+        width = args.width
+        height = args.height
+        if args.origin_size:
+            width = (frame_width // 64) * 64
+            height = (frame_height // 64) * 64
 
         demo_config["models"]["device"] = args.device
         demo_config["data"]["input_frames"] = {
             "video_file": args.video_path,
             "image_folder": None,
-            "height": args.height,
-            "width": args.width,
-            "start_frame_id": args.start_frame_id,
+            "height": height,
+            "width": width,
+            "start_frame_id": start_frame_id,
             "end_frame_id": end_frame_id
         }
         demo_config["data"]["controlnet_frames"] = [demo_config["data"]["input_frames"], demo_config["data"]["input_frames"]]
@@ -63,6 +80,7 @@ if __name__ == "__main__":
         demo_config["pipeline"]["seed"] = args.seed
         demo_config["pipeline"]["pipeline_inputs"]["prompt"] = args.prompt
         demo_config["pipeline"]["pipeline_inputs"]["num_inference_steps"] = args.steps
+        demo_config["pipeline"]["pipeline_inputs"]["cfg_scale"] = args.cfg_scale
 
         print(demo_config)
 
