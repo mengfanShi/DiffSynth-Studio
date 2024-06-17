@@ -27,6 +27,8 @@ def parse_args():
                         help="Stable Diffusion model path.")
     parser.add_argument("--animatediff", type=str, default="models/AnimateDiff/mm_sd_v15_v2.ckpt",
                         help="Animatediff model path.")
+    parser.add_argument("--animatediff_size", type=int, default=16, help="Animatediff batch size.")
+    parser.add_argument("--animatediff_stride", type=int, default=8, help="Animatediff stride.")
 
     args = parser.parse_args()
     return args
@@ -81,6 +83,8 @@ if __name__ == "__main__":
         demo_config["pipeline"]["pipeline_inputs"]["prompt"] = args.prompt
         demo_config["pipeline"]["pipeline_inputs"]["num_inference_steps"] = args.steps
         demo_config["pipeline"]["pipeline_inputs"]["cfg_scale"] = args.cfg_scale
+        demo_config["pipeline"]["pipeline_inputs"]["animatediff_batch_size"] = args.animatediff_size
+        demo_config["pipeline"]["pipeline_inputs"]["animatediff_stride"] = args.animatediff_stride
 
         print(demo_config)
 

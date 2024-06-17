@@ -40,7 +40,7 @@ def lets_dance_with_long_video(
             sample[batch_id: batch_id_].to(device),
             timestep,
             encoder_hidden_states[batch_id: batch_id_].to(device),
-            controlnet_frames[:, batch_id: batch_id_].to(device) if controlnet_frames is not None else None,
+            controlnet_frames=controlnet_frames[:, batch_id: batch_id_].to(device) if controlnet_frames is not None else None,
             unet_batch_size=unet_batch_size, controlnet_batch_size=controlnet_batch_size,
             cross_frame_attention=cross_frame_attention,
             device=device, vram_limit_level=vram_limit_level
@@ -118,19 +118,19 @@ class SDVideoPipeline(torch.nn.Module):
         pipe.fetch_prompter(model_manager)
         pipe.fetch_controlnet_models(model_manager, controlnet_config_units)
         return pipe
-    
+
 
     def preprocess_image(self, image):
         image = torch.Tensor(np.array(image, dtype=np.float32) * (2 / 255) - 1).permute(2, 0, 1).unsqueeze(0)
         return image
-    
+
 
     def decode_image(self, latent, tiled=False, tile_size=64, tile_stride=32):
         image = self.vae_decoder(latent.to(self.device), tiled=tiled, tile_size=tile_size, tile_stride=tile_stride)[0]
         image = image.cpu().permute(1, 2, 0).numpy()
         image = Image.fromarray(((image / 2 + 0.5).clip(0, 1) * 255).astype("uint8"))
         return image
-    
+
 
     def decode_images(self, latents, tiled=False, tile_size=64, tile_stride=32):
         images = [
@@ -138,7 +138,7 @@ class SDVideoPipeline(torch.nn.Module):
             for frame_id in range(latents.shape[0])
         ]
         return images
-    
+
 
     def encode_images(self, processed_images, tiled=False, tile_size=64, tile_stride=32):
         latents = []
@@ -148,7 +148,7 @@ class SDVideoPipeline(torch.nn.Module):
             latents.append(latent)
         latents = torch.concat(latents, dim=0)
         return latents
-    
+
 
     @torch.no_grad()
     def __call__(
@@ -212,7 +212,7 @@ class SDVideoPipeline(torch.nn.Module):
                     self.controlnet.process_image(controlnet_frame).to(self.torch_dtype)
                     for controlnet_frame in progress_bar_cmd(controlnet_frames)
                 ], dim=1)
-        
+
         # Denoise
         for progress_id, timestep in enumerate(progress_bar_cmd(self.scheduler.timesteps)):
             timestep = torch.IntTensor((timestep,))[0].to(self.device)
@@ -248,7 +248,7 @@ class SDVideoPipeline(torch.nn.Module):
             # UI
             if progress_bar_st is not None:
                 progress_bar_st.progress(progress_id / len(self.scheduler.timesteps))
-        
+
         # Decode image
         output_frames = self.decode_images(latents)
 
@@ -281,7 +281,7 @@ class SDVideoPipelineRunner:
             ]
         )
         return model_manager, pipe
-    
+
 
     def load_smoother(self, model_manager, smoother_configs):
         smoother = SequencialProcessor.from_model_manager(model_manager, smoother_configs)
