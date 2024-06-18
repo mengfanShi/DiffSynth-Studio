@@ -58,58 +58,63 @@ class ModelManager:
             return False
         param_name = "model.diffusion_model.output_blocks.9.1.transformer_blocks.0.norm3.weight"
         return param_name in state_dict
-    
+
     def is_controlnet(self, state_dict):
         param_name = "control_model.time_embed.0.weight"
         param_name_2 = "mid_block.resnets.1.time_emb_proj.weight" # For controlnets in diffusers format
         return param_name in state_dict or param_name_2 in state_dict
-    
+
     def is_animatediff(self, state_dict):
         param_name = "mid_block.motion_modules.0.temporal_transformer.proj_out.weight"
         return param_name in state_dict
-    
+
+    def is_animatediff_v3(self, state_dict):
+        param_name = "up_blocks.3.motion_modules.2.temporal_transformer.transformer_blocks.0.ff_norm.weight"
+        return param_name in state_dict
+
     def is_animatediff_xl(self, state_dict):
         param_name = "up_blocks.2.motion_modules.2.temporal_transformer.transformer_blocks.0.ff_norm.weight"
-        return param_name in state_dict
-    
+        neg_param_name = "up_blocks.3.motion_modules.2.temporal_transformer.transformer_blocks.0.ff_norm.weight"
+        return param_name in state_dict and not neg_param_name in state_dict
+
     def is_sd_lora(self, state_dict):
         param_name = "lora_unet_up_blocks_3_attentions_2_transformer_blocks_0_ff_net_2.lora_up.weight"
         return param_name in state_dict
-    
+
     def is_translator(self, state_dict):
         param_name = "model.encoder.layers.5.self_attn_layer_norm.weight"
         return param_name in state_dict and len(state_dict) == 254
-    
+
     def is_ipadapter(self, state_dict):
         return "image_proj" in state_dict and "ip_adapter" in state_dict and state_dict["image_proj"]["proj.weight"].shape == torch.Size([3072, 1024])
-    
+
     def is_ipadapter_image_encoder(self, state_dict):
         param_name = "vision_model.encoder.layers.31.self_attn.v_proj.weight"
         return param_name in state_dict and len(state_dict) == 521
-    
+
     def is_ipadapter_xl(self, state_dict):
         return "image_proj" in state_dict and "ip_adapter" in state_dict and state_dict["image_proj"]["proj.weight"].shape == torch.Size([8192, 1280])
-    
+
     def is_ipadapter_xl_image_encoder(self, state_dict):
         param_name = "vision_model.encoder.layers.47.self_attn.v_proj.weight"
         return param_name in state_dict and len(state_dict) == 777
-    
+
     def is_hunyuan_dit_clip_text_encoder(self, state_dict):
         param_name = "bert.encoder.layer.23.attention.output.dense.weight"
         return param_name in state_dict
-    
+
     def is_hunyuan_dit_t5_text_encoder(self, state_dict):
         param_name = "encoder.block.0.layer.0.SelfAttention.relative_attention_bias.weight"
         return param_name in state_dict
-    
+
     def is_hunyuan_dit(self, state_dict):
         param_name = "final_layer.adaLN_modulation.1.weight"
         return param_name in state_dict
-    
+
     def is_diffusers_vae(self, state_dict):
         param_name = "quant_conv.weight"
         return param_name in state_dict
-    
+
     def load_stable_video_diffusion(self, state_dict, components=None, file_path=""):
         component_dict = {
             "image_encoder": SVDImageEncoder,
@@ -124,7 +129,7 @@ class ModelManager:
             self.model[component].load_state_dict(self.model[component].state_dict_converter().from_civitai(state_dict))
             self.model[component].to(self.torch_dtype).to(self.device)
             self.model_path[component] = file_path
-    
+
     def load_stable_diffusion(self, state_dict, components=None, file_path=""):
         component_dict = {
             "text_encoder": SDTextEncoder,
@@ -190,6 +195,14 @@ class ModelManager:
         component = "motion_modules"
         model = SDMotionModel()
         model.load_state_dict(model.state_dict_converter().from_civitai(state_dict))
+        model.to(self.torch_dtype).to(self.device)
+        self.model[component] = model
+        self.model_path[component] = file_path
+
+    def load_animatediff_v3(self, state_dict, file_path=""):
+        component = "motion_modules"
+        model = SDMotionModel(mm_v3=True)
+        model.load_state_dict(model.state_dict_converter().from_civitai(state_dict, mm_v3=True))
         model.to(self.torch_dtype).to(self.device)
         self.model[component] = model
         self.model_path[component] = file_path
@@ -331,13 +344,15 @@ class ModelManager:
                     tokens = [f"{keyword}_{i}" for i in range(embeddings.shape[0])]
                     self.textual_inversion_dict[keyword] = (tokens, embeddings)
                     break
-        
+
     def load_model(self, file_path, components=None, lora_alphas=[]):
         state_dict = load_state_dict(file_path, torch_dtype=self.torch_dtype)
         if self.is_stable_video_diffusion(state_dict):
             self.load_stable_video_diffusion(state_dict, file_path=file_path)
         elif self.is_animatediff(state_dict):
             self.load_animatediff(state_dict, file_path=file_path)
+        elif self.is_animatediff_v3(state_dict):
+            self.load_animatediff_v3(state_dict, file_path=file_path)
         elif self.is_animatediff_xl(state_dict):
             self.load_animatediff_xl(state_dict, file_path=file_path)
         elif self.is_controlnet(state_dict):
@@ -374,7 +389,7 @@ class ModelManager:
     def load_models(self, file_path_list, lora_alphas=[]):
         for file_path in file_path_list:
             self.load_model(file_path, lora_alphas=lora_alphas)
-        
+
     def to(self, device):
         for component in self.model:
             if isinstance(self.model[component], list):
@@ -394,7 +409,7 @@ class ModelManager:
                     if os.path.samefile(model_path_, model_path):
                         return self.model[component][i]
         raise ValueError(f"Please load model {model_path} before you use it.")
-    
+
     def __getattr__(self, __name):
         if __name in self.model:
             return self.model[__name]

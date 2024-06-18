@@ -29,6 +29,7 @@ def parse_args():
                         help="Animatediff model path.")
     parser.add_argument("--animatediff_size", type=int, default=16, help="Animatediff batch size.")
     parser.add_argument("--animatediff_stride", type=int, default=8, help="Animatediff stride.")
+    parser.add_argument("--denoise", type=float, default=1, help="Denoising strength.")
 
     args = parser.parse_args()
     return args
@@ -61,8 +62,8 @@ if __name__ == "__main__":
             fps = int(cap.get(cv2.CAP_PROP_FPS))
             cap.release()
 
-        width = args.width
-        height = args.height
+        width = (args.width // 64) * 64
+        height = (args.height // 64) * 64
         if args.origin_size:
             width = (frame_width // 64) * 64
             height = (frame_height // 64) * 64
@@ -85,6 +86,7 @@ if __name__ == "__main__":
         demo_config["pipeline"]["pipeline_inputs"]["cfg_scale"] = args.cfg_scale
         demo_config["pipeline"]["pipeline_inputs"]["animatediff_batch_size"] = args.animatediff_size
         demo_config["pipeline"]["pipeline_inputs"]["animatediff_stride"] = args.animatediff_stride
+        demo_config["pipeline"]["pipeline_inputs"]["denoising_strength"] = args.denoise
 
         print(demo_config)
 
