@@ -1,5 +1,6 @@
 from examples.Diffutoon.diffutoon_toon_shading import config
 from diffsynth import SDVideoPipelineRunner
+from diffsynth.extensions.CUGAN.inference_video import VideoRealWaifuUpScaler
 import argparse
 import datetime
 import os
@@ -23,13 +24,17 @@ def parse_args():
     parser.add_argument("--seed", type=int, default=0, help="seed of generate video.")
     parser.add_argument("--cfg_scale", type=float, default=7.0, help="cfg_scale.")
     parser.add_argument("--fps", type=int, default=30, help="fps of generate video.")
-    parser.add_argument("--model_path", type=str, default="models/stable_diffusion/aingdiffusion_v12.safetensors",
+    parser.add_argument("--model_path", type=str, default="models/stable_diffusion/aingdiffusion_v17.safetensors",
                         help="Stable Diffusion model path.")
-    parser.add_argument("--animatediff", type=str, default="models/AnimateDiff/mm_sd_v15_v2.ckpt",
+    parser.add_argument("--animatediff", type=str, default="models/AnimateDiff/mm_sd_v15_v3.ckpt",
                         help="Animatediff model path.")
     parser.add_argument("--animatediff_size", type=int, default=16, help="Animatediff batch size.")
     parser.add_argument("--animatediff_stride", type=int, default=8, help="Animatediff stride.")
     parser.add_argument("--denoise", type=float, default=1, help="Denoising strength.")
+    parser.add_argument("--super_model", type=str, default=None, help="Super Resolution model path.")
+    parser.add_argument("--upscaler_scale", type=int, default=2, help="Super Resolution scalser scale.")
+    parser.add_argument("--upscale_input", action="store_true", help="whether upscale input video.")
+    parser.add_argument("--upscale_output", action="store_true", help="whether upscale output video.")
 
     args = parser.parse_args()
     return args
@@ -41,8 +46,17 @@ if __name__ == "__main__":
     args = parse_args()
 
     if os.path.isfile(args.video_path):
-        basename = os.path.splitext(os.path.basename(args.video_path))[0]
+        basename, ext = os.path.splitext(os.path.basename(args.video_path))
         output_dir = os.path.join(args.output_folder, basename + time_str)
+
+        if args.super_model is not None and os.path.exists(args.super_model):
+            video_upscaler = VideoRealWaifuUpScaler(
+                scale=args.upscaler_scale, weight_path=args.super_model, device=args.device)
+
+        if args.upscale_input:
+            video_upscaler.start()
+            video_upscaler(args.video_path, output_dir, "upscaled_input")
+            args.video_path = os.path.join(output_dir, "upscaled_input" + ext)
 
         if os.path.isfile(args.model_path):
             demo_config["models"]["model_list"][0] = args.model_path
@@ -92,6 +106,10 @@ if __name__ == "__main__":
 
         runner = SDVideoPipelineRunner()
         runner.run(demo_config)
+
+        if args.upscale_output:
+            video_upscaler.start()
+            video_upscaler(os.path.join(output_dir, "video.mp4"), output_dir)
 
 
 

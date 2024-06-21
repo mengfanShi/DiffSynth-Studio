@@ -1,7 +1,7 @@
 #!/bin/bash
 
-wget -c -O "models/stable_diffusion/aingdiffusion_v12.safetensors" "https://civitai.com/api/download/models/229575"
-wget -c -O "models/AnimateDiff/mm_sd_v15_v2.ckpt" "https://huggingface.co/guoyww/animatediff/resolve/main/mm_sd_v15_v2.ckpt"
+wget -c -O "models/stable_diffusion/aingdiffusion_v17.safetensors" "https://civitai.com/api/download/models/420724"
+wget -c -O "models/AnimateDiff/mm_sd_v15_v3.ckpt" "https://huggingface.co/guoyww/animatediff/resolve/main/v3_sd15_mm.ckpt"
 wget -c -O "models/ControlNet/control_v11p_sd15_lineart.pth" "https://huggingface.co/lllyasviel/ControlNet-v1-1/resolve/main/control_v11p_sd15_lineart.pth"
 wget -c -O "models/ControlNet/control_v11f1e_sd15_tile.pth" "https://huggingface.co/lllyasviel/ControlNet-v1-1/resolve/main/control_v11f1e_sd15_tile.pth"
 wget -c -O "models/ControlNet/control_v11f1p_sd15_depth.pth" "https://huggingface.co/lllyasviel/ControlNet-v1-1/resolve/main/control_v11f1p_sd15_depth.pth"
