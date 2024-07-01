@@ -18,7 +18,8 @@ config = {
             "models/stable_diffusion/aingdiffusion_v12.safetensors",
             "models/AnimateDiff/mm_sd_v15_v2.ckpt",
             "models/ControlNet/control_v11f1e_sd15_tile.pth",
-            "models/ControlNet/control_v11p_sd15_lineart.pth"
+            "models/ControlNet/control_v11p_sd15_lineart.pth",
+            "models/RIFE/flownet.pkl"
         ],
         "textual_inversion_folder": "models/textual_inversion",
         "device": "cuda",
@@ -66,6 +67,7 @@ config = {
         "output_folder": "data/examples/diffutoon/output",
         "fps": 30
     },
+    "smoother_configs": [],
     "pipeline": {
         "seed": 0,
         "pipeline_inputs": {
@@ -80,6 +82,7 @@ config = {
             "unet_batch_size": 1,
             "controlnet_batch_size": 1,
             "cross_frame_attention": False,
+            "smoother_progress_ids": [-1],
             # The following parameters will be overwritten. You don't need to modify them.
             "input_frames": [],
             "num_frames": 30,
