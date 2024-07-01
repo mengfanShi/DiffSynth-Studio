@@ -1,15 +1,21 @@
 from .utils import Prompter, tokenize_long_prompt
 from transformers import CLIPTokenizer
 from ..models import SDXLTextEncoder, SDXLTextEncoder2
-import torch
+import torch, os
 
 
 class SDXLPrompter(Prompter):
     def __init__(
         self,
-        tokenizer_path="configs/stable_diffusion/tokenizer",
-        tokenizer_2_path="configs/stable_diffusion_xl/tokenizer_2"
+        tokenizer_path=None,
+        tokenizer_2_path=None
     ):
+        if tokenizer_path is None:
+            base_path = os.path.dirname(os.path.dirname(__file__))
+            tokenizer_path = os.path.join(base_path, "tokenizer_configs/stable_diffusion/tokenizer")
+        if tokenizer_2_path is None:
+            base_path = os.path.dirname(os.path.dirname(__file__))
+            tokenizer_2_path = os.path.join(base_path, "tokenizer_configs/stable_diffusion_xl/tokenizer_2")
         super().__init__()
         self.tokenizer = CLIPTokenizer.from_pretrained(tokenizer_path)
         self.tokenizer_2 = CLIPTokenizer.from_pretrained(tokenizer_2_path)
@@ -35,6 +41,10 @@ class SDXLPrompter(Prompter):
         add_text_embeds, prompt_emb_2 = text_encoder_2(input_ids_2, clip_skip=clip_skip_2)
 
         # Merge
+        if prompt_emb_1.shape[0] != prompt_emb_2.shape[0]:
+            max_batch_size = min(prompt_emb_1.shape[0], prompt_emb_2.shape[0])
+            prompt_emb_1 = prompt_emb_1[: max_batch_size]
+            prompt_emb_2 = prompt_emb_2[: max_batch_size]
         prompt_emb = torch.concatenate([prompt_emb_1, prompt_emb_2], dim=-1)
 
         # For very long prompt, we only use the first 77 tokens to compute `add_text_embeds`.
