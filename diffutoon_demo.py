@@ -1,7 +1,6 @@
 from examples.Diffutoon.diffutoon_toon_shading import config
 from diffsynth import SDVideoPipelineRunner
 from diffsynth.extensions.CUGAN.inference_video import VideoRealWaifuUpScaler
-from diffsynth.extensions.RIFE import RIFESmoother, IFNet
 import argparse
 import datetime
 import os
@@ -24,7 +23,7 @@ def parse_args():
     parser.add_argument("--steps", type=int, default=10, help="Number of inference steps.")
     parser.add_argument("--seed", type=int, default=0, help="seed of generate video.")
     parser.add_argument("--cfg_scale", type=float, default=7.0, help="cfg_scale.")
-    parser.add_argument("--fps", type=int, default=30, help="fps of generate video.")
+    parser.add_argument("--fps", type=float, default=None, help="fps of generate video.")
     parser.add_argument("--model_path", type=str, default="models/stable_diffusion/aingdiffusion_v16.safetensors",
                         help="Stable Diffusion model path.")
     parser.add_argument("--animatediff", type=str, default="models/AnimateDiff/mm_sd_v15_v3.ckpt",
@@ -39,6 +38,7 @@ def parse_args():
     parser.add_argument("--upscale_output", action="store_true", help="whether upscale output video.")
     parser.add_argument("--use_rife", action="store_true", help="whether use rife smooth.")
     parser.add_argument("--use_fastblend", action="store_true", help="whether use FastBlend smooth.")
+    parser.add_argument("--interpolate", type=int, default=0, help="interpolate times param.")
 
     args = parser.parse_args()
     return args
@@ -52,15 +52,41 @@ if __name__ == "__main__":
     if os.path.isfile(args.video):
         basename, ext = os.path.splitext(os.path.basename(args.video))
         output_dir = os.path.join(args.output_folder, basename + time_str + f"-{args.steps}steps")
+        video = args.video
 
-        cap = cv2.VideoCapture(args.video)
+        interpolate = args.use_rife and args.interpolate > 0
+        if interpolate:
+            os.makedirs(output_dir, exist_ok=True)
+            cap = cv2.VideoCapture(video)
+            out = cv2.VideoWriter(
+                os.path.join(output_dir, "video_sample" + ext),
+                cv2.VideoWriter_fourcc(*'mp4v'), cap.get(cv2.CAP_PROP_FPS) / (args.interpolate + 1),
+                (int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
+            )
+
+            frame_count = 0
+            while cap.isOpened():
+                ret, frame = cap.read()
+                if not ret:
+                    break
+                if frame_count % (args.interpolate + 1) == 0:
+                    out.write(frame)
+                frame_count += 1
+            cap.release()
+            out.release()
+            video = os.path.join(output_dir, "video_sample" + ext)
+
+        cap = cv2.VideoCapture(video)
         frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         is_1080p = min(frame_width, frame_height) >= 1024
 
         start_frame_id = 0 if args.total_video else args.start_frame_id
         end_frame_id = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) if args.total_video else args.end_frame_id
-        fps = int(cap.get(cv2.CAP_PROP_FPS)) if args.total_video else args.fps
+        if args.fps is None:
+            fps = cap.get(cv2.CAP_PROP_FPS) * (args.interpolate + 1) if interpolate else cap.get(cv2.CAP_PROP_FPS)
+        else:
+            fps = args.fps
         cap.release()
 
         if args.super_model is not None and os.path.exists(args.super_model):
@@ -69,8 +95,8 @@ if __name__ == "__main__":
 
         if args.upscale_input or not is_1080p:
             video_upscaler.start()
-            video_upscaler(args.video, output_dir, "upscaled_input")
-            args.video = os.path.join(output_dir, "upscaled_input" + ext)
+            video_upscaler(video, output_dir, "upscaled_input")
+            video = os.path.join(output_dir, "upscaled_input" + ext)
             frame_width *= args.upscaler_scale
             frame_height *= args.upscaler_scale
 
@@ -80,15 +106,15 @@ if __name__ == "__main__":
         if os.path.isfile(args.animatediff):
             demo_config["models"]["model_list"][1] = args.animatediff
 
-        width = (args.width // 64) * 64
-        height = (args.height // 64) * 64
+        width = ((args.width + 63) // 64) * 64
+        height = ((args.height + 63) // 64) * 64
         if args.origin_size:
-            width = (frame_width // 64) * 64
-            height = (frame_height // 64) * 64
+            width = ((frame_width + 63) // 64) * 64
+            height = ((frame_height + 63) // 64) * 64
 
         demo_config["models"]["device"] = args.device
         demo_config["data"]["input_frames"] = {
-            "video_file": args.video,
+            "video_file": video,
             "image_folder": None,
             "height": height,
             "width": width,
@@ -105,9 +131,13 @@ if __name__ == "__main__":
         demo_config["pipeline"]["pipeline_inputs"]["animatediff_batch_size"] = args.animatediff_size
         demo_config["pipeline"]["pipeline_inputs"]["animatediff_stride"] = args.animatediff_stride
         demo_config["pipeline"]["pipeline_inputs"]["denoising_strength"] = args.denoise
+        demo_config["pipeline"]["pipeline_inputs"]["vram_limit_level"] = 1
 
         if args.use_rife:
-            demo_config["smoother_configs"].append({"processor_type": "RIFE", "config": {"interpolate": False}})
+            demo_config["smoother_configs"].append(
+                {"processor_type": "RIFE", "config": {"interpolate": interpolate, "interpolate_times": args.interpolate}})
+        else:
+            demo_config["models"]["model_list"].pop()
 
         if args.use_fastblend:
             demo_config["smoother_configs"].append({"processor_type": "FastBlend", "config": {}})
