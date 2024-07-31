@@ -1,5 +1,5 @@
 from examples.Diffutoon.diffutoon_toon_shading import config
-from diffsynth import SDVideoPipelineRunner
+from diffsynth import SDVideoPipelineRunner, SDImagePipelineRunner
 from diffsynth.extensions.CUGAN.inference_video import VideoRealWaifuUpScaler
 import argparse
 import datetime
@@ -8,10 +8,10 @@ import cv2
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Run SDVideoPipelineRunner with specified parameters.")
+    parser = argparse.ArgumentParser(description="Run Video Style Transfer with specified parameters.")
 
     parser.add_argument("--video", type=str, required=True, help="Path to the input video file.")
-    parser.add_argument("--prompt", type=str, required=True, help="Prompt for the pipeline.")
+    parser.add_argument("--prompt", type=str, default="masterpiece", help="Prompt for the pipeline.")
     parser.add_argument("--height", type=int, default=1024, help="Height of the input video frames, multiple of 64.")
     parser.add_argument("--width", type=int, default=1024, help="Width of the input video frames, multiple of 64.")
     parser.add_argument("--device", type=str, default="cuda", help="Device to run the pipeline on (e.g., 'cuda', 'cpu').")
@@ -26,6 +26,8 @@ def parse_args():
     parser.add_argument("--fps", type=float, default=None, help="fps of generate video.")
     parser.add_argument("--model_path", type=str, default="models/stable_diffusion/aingdiffusion_v16.safetensors",
                         help="Stable Diffusion model path.")
+    parser.add_argument("--lora", type=str, default=None, help="Lora model path.")
+    parser.add_argument("--lora_alpha", type=float, default=0.5, help="Lora alpha.")
     parser.add_argument("--animatediff", type=str, default="models/AnimateDiff/mm_sd_v15_v3.ckpt",
                         help="Animatediff model path.")
     parser.add_argument("--animatediff_size", type=int, default=16, help="Animatediff batch size.")
@@ -37,8 +39,10 @@ def parse_args():
     parser.add_argument("--upscale_input", action="store_true", help="whether upscale input video.")
     parser.add_argument("--upscale_output", action="store_true", help="whether upscale output video.")
     parser.add_argument("--use_rife", action="store_true", help="whether use rife smooth.")
+    parser.add_argument("--rife_model", type=str, default="models/RIFE/flownet.pkl")
     parser.add_argument("--use_fastblend", action="store_true", help="whether use FastBlend smooth.")
     parser.add_argument("--interpolate", type=int, default=0, help="interpolate times param.")
+    parser.add_argument("--trans_first_frame", action="store_true", help="whether transform input video's first frame.")
 
     args = parser.parse_args()
     return args
@@ -93,7 +97,8 @@ if __name__ == "__main__":
             video_upscaler = VideoRealWaifuUpScaler(
                 scale=args.upscaler_scale, weight_path=args.super_model, device=args.device)
 
-        if args.upscale_input or not is_1080p:
+        # if args.upscale_input or not is_1080p:
+        if args.upscale_input:
             video_upscaler.start()
             video_upscaler(video, output_dir, "upscaled_input")
             video = os.path.join(output_dir, "upscaled_input" + ext)
@@ -106,8 +111,13 @@ if __name__ == "__main__":
         if os.path.isfile(args.animatediff):
             demo_config["models"]["model_list"][1] = args.animatediff
 
+        if args.lora is not None and os.path.isfile(args.lora):
+            demo_config["models"]["model_list"].append(args.lora)
+            demo_config["models"]["lora_alphas"].append(args.lora_alpha)
+
         width = ((args.width + 63) // 64) * 64
         height = ((args.height + 63) // 64) * 64
+
         if args.origin_size:
             width = ((frame_width + 63) // 64) * 64
             height = ((frame_height + 63) // 64) * 64
@@ -133,24 +143,51 @@ if __name__ == "__main__":
         demo_config["pipeline"]["pipeline_inputs"]["denoising_strength"] = args.denoise
         demo_config["pipeline"]["pipeline_inputs"]["vram_limit_level"] = 1
 
-        if args.use_rife:
+        if args.use_rife and os.path.isfile(args.rife_model):
+            demo_config["models"]["model_list"].append(args.rife_model)
             demo_config["smoother_configs"].append(
                 {"processor_type": "RIFE", "config": {"interpolate": interpolate, "interpolate_times": args.interpolate}})
-        else:
-            demo_config["models"]["model_list"].pop()
 
         if args.use_fastblend:
             demo_config["smoother_configs"].append({"processor_type": "FastBlend", "config": {}})
 
-        print(demo_config)
+        if args.trans_first_frame:
+            image_config = {}
+            image_config["models"] = demo_config["models"]
+            del image_config["models"]["model_list"][1]
+            image_config["data"] = {}
+            image_config["pipeline"] = {}
+            image_config["pipeline"]["pipeline_inputs"] = {}
+            image_config["data"]["input_frames"] = {
+                "video_file": video,
+                "image_folder": None,
+                "height": height,
+                "width": width,
+            }
+            image_config["data"]["output_folder"] = output_dir
+            image_config["pipeline"]["seed"] = args.seed
+            image_config["pipeline"]["pipeline_inputs"]["prompt"] = args.prompt
+            image_config["pipeline"]["pipeline_inputs"]["negative_prompt"] = "verybadimagenegative_v1.3"
+            image_config["pipeline"]["pipeline_inputs"]["num_inference_steps"] = args.steps
+            image_config["pipeline"]["pipeline_inputs"]["cfg_scale"] = args.cfg_scale
+            image_config["pipeline"]["pipeline_inputs"]["denoising_strength"] = args.denoise
 
-        runner = SDVideoPipelineRunner()
-        runner.run(demo_config)
+            print(image_config)
+            image_runner = SDImagePipelineRunner()
+            image_gen = image_runner.run(image_config)
 
-        if args.upscale_output:
-            video_name = "video.mp4"
-            video_upscaler.start()
-            video_upscaler(os.path.join(output_dir, video_name), output_dir)
+            if args.upscale_output:
+                image_super = video_upscaler.process_image(image_gen)
+                image_super.save(os.path.join(output_dir, "super_image.png"))
+        else:
+            print(demo_config)
+            runner = SDVideoPipelineRunner()
+            runner.run(demo_config)
+
+            if args.upscale_output:
+                video_name = "video.mp4"
+                video_upscaler.start()
+                video_upscaler(os.path.join(output_dir, video_name), output_dir)
 
 
 

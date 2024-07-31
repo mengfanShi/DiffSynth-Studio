@@ -2,9 +2,10 @@ from ..models import ModelManager, SDTextEncoder, SDUNet, SDVAEDecoder, SDVAEEnc
 from ..controlnets import MultiControlNetManager, ControlNetUnit, ControlNetConfigUnit, Annotator
 from ..prompts import SDPrompter
 from ..schedulers import EnhancedDDIMScheduler
+from ..data import VideoData, save_frames
 from .dancer import lets_dance
 from typing import List
-import torch
+import torch, os
 from tqdm import tqdm
 from PIL import Image
 import numpy as np
@@ -46,7 +47,7 @@ class SDImagePipeline(torch.nn.Module):
             controlnet_units.append(controlnet_unit)
         self.controlnet = MultiControlNetManager(controlnet_units)
 
-    
+
     def fetch_ipadapter(self, model_manager: ModelManager):
         if "ipadapter" in model_manager.model:
             self.ipadapter = model_manager.ipadapter
@@ -69,19 +70,19 @@ class SDImagePipeline(torch.nn.Module):
         pipe.fetch_controlnet_models(model_manager, controlnet_config_units)
         pipe.fetch_ipadapter(model_manager)
         return pipe
-    
+
 
     def preprocess_image(self, image):
         image = torch.Tensor(np.array(image, dtype=np.float32) * (2 / 255) - 1).permute(2, 0, 1).unsqueeze(0)
         return image
-    
+
 
     def decode_image(self, latent, tiled=False, tile_size=64, tile_stride=32):
         image = self.vae_decoder(latent.to(self.device), tiled=tiled, tile_size=tile_size, tile_stride=tile_stride)[0]
         image = image.cpu().permute(1, 2, 0).numpy()
         image = Image.fromarray(((image / 2 + 0.5).clip(0, 1) * 255).astype("uint8"))
         return image
-    
+
 
     @torch.no_grad()
     def __call__(
@@ -132,7 +133,7 @@ class SDImagePipeline(torch.nn.Module):
         if controlnet_image is not None:
             controlnet_image = self.controlnet.process_image(controlnet_image).to(device=self.device, dtype=self.torch_dtype)
             controlnet_image = controlnet_image.unsqueeze(1)
-        
+
         # Denoise
         for progress_id, timestep in enumerate(progress_bar_cmd(self.scheduler.timesteps)):
             timestep = torch.IntTensor((timestep,))[0].to(self.device)
@@ -160,8 +161,64 @@ class SDImagePipeline(torch.nn.Module):
             # UI
             if progress_bar_st is not None:
                 progress_bar_st.progress(progress_id / len(self.scheduler.timesteps))
-        
+
         # Decode image
         image = self.decode_image(latents, tiled=tiled, tile_size=tile_size, tile_stride=tile_stride)
 
         return image
+
+
+class SDImagePipelineRunner:
+    def __init__(self, id=0):
+        self.image_id = id
+
+
+    def load_pipeline(self, model_list, textual_inversion_folder, device, lora_alphas, controlnet_units):
+        # Load models
+        model_manager = ModelManager(torch_dtype=torch.float16, device=device)
+        model_manager.load_textual_inversions(textual_inversion_folder)
+        model_manager.load_models(model_list, lora_alphas=lora_alphas)
+        pipe = SDImagePipeline.from_model_manager(
+            model_manager,
+            [
+                ControlNetConfigUnit(
+                    processor_id=unit["processor_id"],
+                    model_path=unit["model_path"],
+                    scale=unit["scale"]
+                ) for unit in controlnet_units
+            ]
+        )
+        return model_manager, pipe
+
+
+    def synthesize_image(self, model_manager, pipe, seed, **pipeline_inputs):
+        torch.manual_seed(seed)
+        output_image = pipe(**pipeline_inputs)
+        # model_manager.to("cpu")
+        return output_image
+
+
+    def load_image(self, video_file, image_folder, height, width):
+        video = VideoData(video_file=video_file, image_folder=image_folder, height=height, width=width)
+        if self.image_id < 0 or self.image_id >= len(video):
+            self.image_id = 0
+
+        frame = video[self.image_id]
+        return frame
+
+
+    def add_data_to_pipeline_inputs(self, data, pipeline_inputs):
+        pipeline_inputs["input_image"] = self.load_image(**data["input_frames"])
+        pipeline_inputs["controlnet_image"] = pipeline_inputs["input_image"]
+        pipeline_inputs["width"], pipeline_inputs["height"] = pipeline_inputs["input_image"].size
+        return pipeline_inputs
+
+
+    def run(self, config):
+        config["pipeline"]["pipeline_inputs"] = self.add_data_to_pipeline_inputs(config["data"], config["pipeline"]["pipeline_inputs"])
+        model_manager, pipe = self.load_pipeline(**config["models"])
+        output_image = self.synthesize_image(model_manager, pipe, config["pipeline"]["seed"], **config["pipeline"]["pipeline_inputs"])
+
+        os.makedirs(config["data"]["output_folder"], exist_ok=True)
+        output_image.save(os.path.join(config["data"]["output_folder"], "frame_%04d.png" % self.image_id))
+        return output_image

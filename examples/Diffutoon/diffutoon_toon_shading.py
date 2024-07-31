@@ -25,8 +25,7 @@ config = {
             "models/stable_diffusion/aingdiffusion_v12.safetensors",
             "models/AnimateDiff/mm_sd_v15_v2.ckpt",
             "models/ControlNet/control_v11f1e_sd15_tile.pth",
-            "models/ControlNet/control_v11p_sd15_lineart.pth",
-            "models/RIFE/flownet.pkl"
+            "models/ControlNet/control_v11p_sd15_lineart.pth"
         ],
         "textual_inversion_folder": "models/textual_inversion",
         "device": "cuda",

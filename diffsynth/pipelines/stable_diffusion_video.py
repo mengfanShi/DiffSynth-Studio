@@ -297,7 +297,7 @@ class SDVideoPipelineRunner:
             progress_bar_st.progress(1.0)
         else:
             output_video = pipe(**pipeline_inputs, smoother=smoother)
-        model_manager.to("cpu")
+        # model_manager.to("cpu")
         return output_video
 
 
@@ -322,7 +322,7 @@ class SDVideoPipelineRunner:
 
     def save_output(self, video, output_folder, fps, config):
         os.makedirs(output_folder, exist_ok=True)
-        save_frames(video, os.path.join(output_folder, "frames"))
+        # save_frames(video, os.path.join(output_folder, "frames"))
         save_video(video, os.path.join(output_folder, "video.mp4"), fps=fps)
         config["pipeline"]["pipeline_inputs"]["input_frames"] = []
         config["pipeline"]["pipeline_inputs"]["controlnet_frames"] = []

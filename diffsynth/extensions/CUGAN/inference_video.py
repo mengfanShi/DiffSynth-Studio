@@ -5,6 +5,7 @@ from moviepy.video.io.ffmpeg_writer import FFMPEG_VideoWriter
 from moviepy.editor import VideoFileClip
 from .upcunet_v3 import RealWaifuUpScaler
 from time import time as ttime, sleep
+from PIL import Image
 
 
 class UpScalerMT(threading.Thread):
@@ -70,6 +71,15 @@ class VideoRealWaifuUpScaler(object):
                         self.inp_q, self.res_q, model, self.p_sleep, self.nt, self.tile, self.cache_mode, self.alpha
                     )
                     upscaler.start()
+
+    def process_image(self, image):
+        t0 = ttime()
+        model = RealWaifuUpScaler(self.scale, self.weigth_path, self.half, self.device)
+        res = model(image, self.tile, self.cache_mode, self.alpha)
+        res = Image.fromarray(res)
+        t1 = ttime()
+        print("Super Resolution Done. time cost: %.3f" % (t1 - t0))
+        return res
 
     def __call__(self, inp_path, opt_path, out_name="output_super"):
         suffix = inp_path.split(".")[-1]
