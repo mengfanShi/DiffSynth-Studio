@@ -3,7 +3,7 @@ from diffsynth import SDVideoPipelineRunner, download_models
 
 # Download models (automatically)
 # `models/stable_diffusion/aingdiffusion_v12.safetensors`: [link](https://civitai.com/api/download/models/229575)
-# `models/AnimateDiff/mm_sd_v15_v2.ckpt`: [link](https://huggingface.co/guoyww/animatediff/resolve/main/mm_sd_v15_v2.ckpt)
+# `models/AnimateDiff/mm_sd_v15_v3.ckpt`: [link](https://huggingface.co/guoyww/animatediff/resolve/main/mm_sd_v15_v3.ckpt)
 # `models/ControlNet/control_v11p_sd15_lineart.pth`: [link](https://huggingface.co/lllyasviel/ControlNet-v1-1/resolve/main/control_v11p_sd15_lineart.pth)
 # `models/ControlNet/control_v11f1e_sd15_tile.pth`: [link](https://huggingface.co/lllyasviel/ControlNet-v1-1/resolve/main/control_v11f1e_sd15_tile.pth)
 # `models/Annotators/sk_model.pth`: [link](https://huggingface.co/lllyasviel/Annotators/resolve/main/sk_model.pth)
@@ -12,7 +12,7 @@ from diffsynth import SDVideoPipelineRunner, download_models
 
 # download_models([
 #     "AingDiffusion_v12",
-#     "AnimateDiff_v2",
+#     "AnimateDiff_v3",
 #     "ControlNet_v11p_sd15_lineart",
 #     "ControlNet_v11f1e_sd15_tile",
 #     "TextualInversion_VeryBadImageNegative_v1.3"
@@ -29,6 +29,7 @@ config = {
         ],
         "textual_inversion_folder": "models/textual_inversion",
         "device": "cuda",
+        "lora_list": [],
         "lora_alphas": [],
         "controlnet_units": [
             {

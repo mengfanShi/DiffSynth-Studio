@@ -21,7 +21,7 @@ class RIFESmoother(VideoProcessor):
 
     @staticmethod
     def from_model_manager(model_manager, **kwargs):
-        return RIFESmoother(model_manager.RIFE, device=model_manager.device, **kwargs)
+        return RIFESmoother(model_manager.fetch_model("rife"), device=model_manager.device, **kwargs)
 
     def process_image(self, image):
         width, height = image.size
@@ -64,8 +64,10 @@ class RIFESmoother(VideoProcessor):
             batch_id_ = min(batch_id + batch_size, input_tensor.shape[0])
             batch_input_tensor = input_tensor[batch_id: batch_id_]
             batch_input_tensor = batch_input_tensor.to(device=self.device, dtype=self.torch_dtype)
-            flow, mask, merged = self.model(batch_input_tensor, [4/scale, 2/scale, 1/scale])
-            output_tensor.append(merged[2].cpu())
+            # flow, mask, merged = self.model(batch_input_tensor, [4/scale, 2/scale, 1/scale])
+            # output_tensor.append(merged[2].cpu())
+            flow, mask, merged = self.model(batch_input_tensor, scale=[8/scale, 4/scale, 2/scale, 1/scale])
+            output_tensor.append(merged[3].cpu())
         output_tensor = torch.concat(output_tensor, dim=0)
         return output_tensor
 

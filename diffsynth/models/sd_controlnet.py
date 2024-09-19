@@ -97,9 +97,10 @@ class SDControlNet(torch.nn.Module):
         self,
         sample, timestep, encoder_hidden_states, conditioning,
         tiled=False, tile_size=64, tile_stride=32,
+        **kwargs
     ):
         # 1. time
-        time_emb = self.time_proj(timestep[None]).to(sample.dtype)
+        time_emb = self.time_proj(timestep).to(sample.dtype)
         time_emb = self.time_embedding(time_emb)
         time_emb = time_emb.repeat(sample.shape[0], 1)
 
@@ -134,7 +135,8 @@ class SDControlNet(torch.nn.Module):
 
         return controlnet_res_stack
 
-    def state_dict_converter(self):
+    @staticmethod
+    def state_dict_converter():
         return SDControlNetStateDictConverter()
 
 

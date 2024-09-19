@@ -58,7 +58,7 @@ class IFBlock(nn.Module):
 
 
 class IFNet(nn.Module):
-    def __init__(self):
+    def __init__(self, **kwargs):
         super(IFNet, self).__init__()
         self.block0 = IFBlock(7+4, c=90)
         self.block1 = IFBlock(7+4, c=90)
@@ -99,7 +99,8 @@ class IFNet(nn.Module):
             merged[i] = merged[i][0] * mask_list[i] + merged[i][1] * (1 - mask_list[i])    
         return flow_list, mask_list[2], merged
     
-    def state_dict_converter(self):
+    @staticmethod
+    def state_dict_converter():
         return IFNetStateDictConverter()
 
 
@@ -112,7 +113,7 @@ class IFNetStateDictConverter:
         return state_dict_
     
     def from_civitai(self, state_dict):
-        return self.from_diffusers(state_dict)
+        return self.from_diffusers(state_dict), {"upcast_to_float32": True}
 
 
 class RIFEInterpolater:
@@ -124,7 +125,7 @@ class RIFEInterpolater:
 
     @staticmethod
     def from_model_manager(model_manager):
-        return RIFEInterpolater(model_manager.RIFE, device=model_manager.device)
+        return RIFEInterpolater(model_manager.fetch_model("rife"), device=model_manager.device)
 
     def process_image(self, image):
         width, height = image.size
@@ -202,7 +203,7 @@ class RIFESmoother(RIFEInterpolater):
 
     @staticmethod
     def from_model_manager(model_manager):
-        return RIFESmoother(model_manager.RIFE, device=model_manager.device)
+        return RIFEInterpolater(model_manager.fetch_model("rife"), device=model_manager.device)
     
     def process_tensors(self, input_tensor, scale=1.0, batch_size=4):
         output_tensor = []

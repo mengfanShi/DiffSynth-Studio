@@ -26,8 +26,8 @@ def parse_args():
     parser.add_argument("--fps", type=float, default=None, help="fps of generate video.")
     parser.add_argument("--model_path", type=str, default="models/stable_diffusion/aingdiffusion_v16.safetensors",
                         help="Stable Diffusion model path.")
-    parser.add_argument("--lora", type=str, default=None, help="Lora model path.")
-    parser.add_argument("--lora_alpha", type=float, default=0.5, help="Lora alpha.")
+    parser.add_argument("--lora", type=str, nargs='+', help="Lora model path.")
+    parser.add_argument("--lora_alpha", type=float, nargs='+', help="Lora alpha.")
     parser.add_argument("--animatediff", type=str, default="models/AnimateDiff/mm_sd_v15_v3.ckpt",
                         help="Animatediff model path.")
     parser.add_argument("--animatediff_size", type=int, default=16, help="Animatediff batch size.")
@@ -111,9 +111,11 @@ if __name__ == "__main__":
         if os.path.isfile(args.animatediff):
             demo_config["models"]["model_list"][1] = args.animatediff
 
-        if args.lora is not None and os.path.isfile(args.lora):
-            demo_config["models"]["model_list"].append(args.lora)
-            demo_config["models"]["lora_alphas"].append(args.lora_alpha)
+        if args.lora and args.lora_alpha:
+            assert len(args.lora) == len(args.lora_alpha), "lora and lora_alpha should have same length"
+            for lora, alpha in zip(args.lora, args.lora_alpha):
+                demo_config["models"]["lora_list"].append(lora)
+                demo_config["models"]["lora_alphas"].append(alpha)
 
         width = ((args.width + 63) // 64) * 64
         height = ((args.height + 63) // 64) * 64
@@ -141,7 +143,6 @@ if __name__ == "__main__":
         demo_config["pipeline"]["pipeline_inputs"]["animatediff_batch_size"] = args.animatediff_size
         demo_config["pipeline"]["pipeline_inputs"]["animatediff_stride"] = args.animatediff_stride
         demo_config["pipeline"]["pipeline_inputs"]["denoising_strength"] = args.denoise
-        demo_config["pipeline"]["pipeline_inputs"]["vram_limit_level"] = 1
 
         if args.use_rife and os.path.isfile(args.rife_model):
             demo_config["models"]["model_list"].append(args.rife_model)

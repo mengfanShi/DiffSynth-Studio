@@ -92,7 +92,7 @@ class TemporalBlock(torch.nn.Module):
 
 
 class SDMotionModel(torch.nn.Module):
-    def __init__(self, mm_v3=False):
+    def __init__(self, mm_v3=True):
         super().__init__()
         if not mm_v3:
             self.motion_modules = torch.nn.ModuleList([
@@ -190,7 +190,8 @@ class SDMotionModel(torch.nn.Module):
     def forward(self):
         pass
 
-    def state_dict_converter(self):
+    @staticmethod
+    def state_dict_converter():
         return SDMotionModelStateDictConverter()
 
 
@@ -198,7 +199,7 @@ class SDMotionModelStateDictConverter:
     def __init__(self):
         pass
 
-    def from_diffusers(self, state_dict, mm_v3=False):
+    def from_diffusers(self, state_dict, mm_v3=True):
         rename_dict = {
             "norm": "norm",
             "proj_in": "proj_in",
@@ -241,5 +242,5 @@ class SDMotionModelStateDictConverter:
             state_dict_[rename] = state_dict[name]
         return state_dict_
 
-    def from_civitai(self, state_dict, mm_v3=False):
+    def from_civitai(self, state_dict, mm_v3=True):
         return self.from_diffusers(state_dict, mm_v3)

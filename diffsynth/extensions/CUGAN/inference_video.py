@@ -81,6 +81,46 @@ class VideoRealWaifuUpScaler(object):
         print("Super Resolution Done. time cost: %.3f" % (t1 - t0))
         return res
 
+    def process_video(self, inp_path, opt_path, out_name="output_super"):
+        suffix = inp_path.split(".")[-1]
+        os.makedirs(opt_path, exist_ok=True)
+        output = os.path.join(opt_path, f"{out_name}.{suffix}")
+
+        model = RealWaifuUpScaler(self.scale, self.weigth_path, self.half, self.device)
+        objVideoreader = VideoFileClip(filename=inp_path)
+        w, h = objVideoreader.reader.size
+        fps = objVideoreader.reader.fps
+        if_audio = objVideoreader.audio
+
+        if if_audio:
+            tmp_audio_path = os.path.join(opt_path, "audio.m4a")
+            objVideoreader.audio.write_audiofile(tmp_audio_path, codec="aac")
+            writer = FFMPEG_VideoWriter(
+                output,
+                (w * self.scale, h * self.scale),
+                fps,
+                ffmpeg_params=self.encode_params,
+                audiofile=tmp_audio_path,
+            )
+        else:
+            writer = FFMPEG_VideoWriter(
+                output,
+                (w * self.scale, h * self.scale),
+                fps,
+                ffmpeg_params=self.encode_params,
+            )
+
+        t0 = ttime()
+        for frame in objVideoreader.iter_frames():
+            process_frame = model(frame, self.tile, self.cache_mode, self.alpha)
+            writer.write_frame(process_frame)
+
+        writer.close()
+        if if_audio:
+            os.remove(tmp_audio_path)
+        t1 = ttime()
+        print("Super Resolution Done. time cost: %.3f" % (t1 - t0))
+
     def __call__(self, inp_path, opt_path, out_name="output_super"):
         suffix = inp_path.split(".")[-1]
         os.makedirs(opt_path, exist_ok=True)

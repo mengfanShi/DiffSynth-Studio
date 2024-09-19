@@ -16,7 +16,7 @@ import os
 # `models/textual_inversion/verybadimagenegative_v1.3.pt`: [link](https://civitai.com/api/download/models/25820?type=Model&format=PickleTensor&size=full&fp=fp16)
 download_models([
     "AingDiffusion_v12",
-    "AnimateDiff_v2",
+    "AnimateDiff_v3",
     "ControlNet_v11p_sd15_lineart",
     "ControlNet_v11f1e_sd15_tile",
     "ControlNet_v11f1p_sd15_depth",
@@ -34,6 +34,7 @@ config_stage_1 = {
         ],
         "textual_inversion_folder": "models/textual_inversion",
         "device": "cuda",
+        "lora_list": [],
         "lora_alphas": [],
         "controlnet_units": [
             {
@@ -114,12 +115,13 @@ config_stage_2 = {
     "models": {
         "model_list": [
             "models/stable_diffusion/aingdiffusion_v12.safetensors",
-            "models/AnimateDiff/mm_sd_v15_v2.ckpt",
+            "models/AnimateDiff/mm_sd_v15_v3.ckpt",
             "models/ControlNet/control_v11f1e_sd15_tile.pth",
             "models/ControlNet/control_v11p_sd15_lineart.pth"
         ],
         "textual_inversion_folder": "models/textual_inversion",
         "device": "cuda",
+        "lora_list": [],
         "lora_alphas": [],
         "controlnet_units": [
             {
