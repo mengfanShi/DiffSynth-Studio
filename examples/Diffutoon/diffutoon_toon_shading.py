@@ -25,7 +25,9 @@ config = {
             "models/stable_diffusion/aingdiffusion_v12.safetensors",
             "models/AnimateDiff/mm_sd_v15_v2.ckpt",
             "models/ControlNet/control_v11f1e_sd15_tile.pth",
-            "models/ControlNet/control_v11p_sd15_lineart.pth"
+            "models/ControlNet/control_v11p_sd15_lineart.pth",
+            "models/ControlNet/control_v11p_sd15_softedge.pth",
+            "models/ControlNet/control_v11f1p_sd15_depth.pth",
         ],
         "textual_inversion_folder": "models/textual_inversion",
         "device": "cuda",
@@ -35,12 +37,22 @@ config = {
             {
                 "processor_id": "tile",
                 "model_path": "models/ControlNet/control_v11f1e_sd15_tile.pth",
-                "scale": 0.5
+                "scale": 0.3
             },
             {
                 "processor_id": "lineart",
                 "model_path": "models/ControlNet/control_v11p_sd15_lineart.pth",
-                "scale": 0.5
+                "scale": 0.3
+            },
+            {
+                "processor_id": "softedge",
+                "model_path": "models/ControlNet/control_v11p_sd15_softedge.pth",
+                "scale": 0.3
+            },
+            {
+                "processor_id": "depth",
+                "model_path": "models/ControlNet/control_v11f1p_sd15_depth.pth",
+                "scale": 0.3
             }
         ]
     },
@@ -80,9 +92,9 @@ config = {
         "pipeline_inputs": {
             "prompt": "best quality, perfect anime illustration, light, a girl is dancing, smile, solo",
             "negative_prompt": "verybadimagenegative_v1.3",
-            "cfg_scale": 7.0,
+            "cfg_scale": 3.0,
             "clip_skip": 2,
-            "denoising_strength": 1.0,
+            "denoising_strength": 0.8,
             "num_inference_steps": 10,
             "animatediff_batch_size": 16,
             "animatediff_stride": 8,

@@ -3,7 +3,7 @@ import warnings
 with warnings.catch_warnings():
     warnings.simplefilter("ignore")
     from controlnet_aux.processor import (
-        CannyDetector, MidasDetector, HEDdetector, LineartDetector, LineartAnimeDetector, OpenposeDetector
+        CannyDetector, MidasDetector, PidiNetDetector, LineartDetector, LineartAnimeDetector, OpenposeDetector
     )
 
 
@@ -18,7 +18,7 @@ class Annotator:
         elif processor_id == "depth":
             self.processor = MidasDetector.from_pretrained(model_path).to(device)
         elif processor_id == "softedge":
-            self.processor = HEDdetector.from_pretrained(model_path).to(device)
+            self.processor = PidiNetDetector.from_pretrained(model_path).to(device)
         elif processor_id == "lineart":
             self.processor = LineartDetector.from_pretrained(model_path).to(device)
         elif processor_id == "lineart_anime":
@@ -43,6 +43,8 @@ class Annotator:
             }
         else:
             kwargs = {}
+        if self.processor_id == "lineart":
+            kwargs["coarse"] = True
         if self.processor is not None:
             detect_resolution = self.detect_resolution if self.detect_resolution is not None else min(width, height)
             image = self.processor(image, detect_resolution=detect_resolution, image_resolution=min(width, height), **kwargs)
