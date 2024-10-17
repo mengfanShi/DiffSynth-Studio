@@ -16,6 +16,9 @@ class AutoVideoProcessor(VideoProcessor):
         elif processor_type == "Sharpness":
             from .PILEditor import SharpnessEditor
             return SharpnessEditor.from_model_manager(model_manager, **kwargs)
+        elif processor_type == "Color":
+            from .PILEditor import ColorEditor
+            return ColorEditor.from_model_manager(model_manager, **kwargs)
         elif processor_type == "RIFE":
             from .RIFE import RIFESmoother
             return RIFESmoother.from_model_manager(model_manager, **kwargs)
@@ -34,7 +37,7 @@ class SequencialProcessor(VideoProcessor):
             for config in configs
         ]
         return SequencialProcessor(processors)
-    
+
     def __call__(self, rendered_frames, **kwargs):
         for processor in self.processors:
             rendered_frames = processor(rendered_frames, **kwargs)

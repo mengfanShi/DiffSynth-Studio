@@ -46,3 +46,8 @@ data/*
 *.bak
 *.old
 *.orig
+lorademo.py
+loraserver.py
+loratest.py
+server.py
+test.py

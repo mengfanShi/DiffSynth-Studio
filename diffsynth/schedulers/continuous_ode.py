@@ -10,7 +10,7 @@ class ContinuousODEScheduler():
         self.set_timesteps(num_inference_steps)
 
 
-    def set_timesteps(self, num_inference_steps=100, denoising_strength=1.0):
+    def set_timesteps(self, num_inference_steps=100, denoising_strength=1.0, **kwargs):
         ramp = torch.linspace(1-denoising_strength, 1, num_inference_steps)
         min_inv_rho = torch.pow(torch.tensor((self.sigma_min,)), (1 / self.rho))
         max_inv_rho = torch.pow(torch.tensor((self.sigma_max,)), (1 / self.rho))
@@ -43,3 +43,17 @@ class ContinuousODEScheduler():
         sigma = self.sigmas[timestep_id]
         sample = (original_samples + noise * sigma) / (sigma*sigma + 1).sqrt()
         return sample
+    
+
+    def training_target(self, sample, noise, timestep):
+        timestep_id = torch.argmin((self.timesteps - timestep).abs())
+        sigma = self.sigmas[timestep_id]
+        target = (-(sigma*sigma + 1).sqrt() / sigma + 1 / (sigma*sigma + 1).sqrt() / sigma) * sample + 1 / (sigma*sigma + 1).sqrt() * noise
+        return target
+    
+
+    def training_weight(self, timestep):
+        timestep_id = torch.argmin((self.timesteps - timestep).abs())
+        sigma = self.sigmas[timestep_id]
+        weight = (1 + sigma*sigma).sqrt() / sigma
+        return weight

@@ -50,7 +50,7 @@ class TemporalTransformerBlock(torch.nn.Module):
 
 
 class TemporalBlock(torch.nn.Module):
-    
+
     def __init__(self, num_attention_heads, attention_head_dim, in_channels, num_layers=1, norm_num_groups=32, eps=1e-5):
         super().__init__()
         inner_dim = num_attention_heads * attention_head_dim
@@ -92,59 +92,106 @@ class TemporalBlock(torch.nn.Module):
 
 
 class SDMotionModel(torch.nn.Module):
-    def __init__(self):
+    def __init__(self, mm_v3=True):
         super().__init__()
-        self.motion_modules = torch.nn.ModuleList([
-            TemporalBlock(8, 40, 320, eps=1e-6),
-            TemporalBlock(8, 40, 320, eps=1e-6),
-            TemporalBlock(8, 80, 640, eps=1e-6),
-            TemporalBlock(8, 80, 640, eps=1e-6),
-            TemporalBlock(8, 160, 1280, eps=1e-6),
-            TemporalBlock(8, 160, 1280, eps=1e-6),
-            TemporalBlock(8, 160, 1280, eps=1e-6),
-            TemporalBlock(8, 160, 1280, eps=1e-6),
-            TemporalBlock(8, 160, 1280, eps=1e-6),
-            TemporalBlock(8, 160, 1280, eps=1e-6),
-            TemporalBlock(8, 160, 1280, eps=1e-6),
-            TemporalBlock(8, 160, 1280, eps=1e-6),
-            TemporalBlock(8, 160, 1280, eps=1e-6),
-            TemporalBlock(8, 160, 1280, eps=1e-6),
-            TemporalBlock(8, 160, 1280, eps=1e-6),
-            TemporalBlock(8, 80, 640, eps=1e-6),
-            TemporalBlock(8, 80, 640, eps=1e-6),
-            TemporalBlock(8, 80, 640, eps=1e-6),
-            TemporalBlock(8, 40, 320, eps=1e-6),
-            TemporalBlock(8, 40, 320, eps=1e-6),
-            TemporalBlock(8, 40, 320, eps=1e-6),
-        ])
-        self.call_block_id = {
-            1: 0,
-            4: 1,
-            9: 2,
-            12: 3,
-            17: 4,
-            20: 5,
-            24: 6,
-            26: 7,
-            29: 8,
-            32: 9,
-            34: 10,
-            36: 11,
-            40: 12,
-            43: 13,
-            46: 14,
-            50: 15,
-            53: 16,
-            56: 17,
-            60: 18,
-            63: 19,
-            66: 20
-        }
-        
+        if not mm_v3:
+            self.motion_modules = torch.nn.ModuleList([
+                TemporalBlock(8, 40, 320, eps=1e-6),
+                TemporalBlock(8, 40, 320, eps=1e-6),
+                TemporalBlock(8, 80, 640, eps=1e-6),
+                TemporalBlock(8, 80, 640, eps=1e-6),
+                TemporalBlock(8, 160, 1280, eps=1e-6),
+                TemporalBlock(8, 160, 1280, eps=1e-6),
+                TemporalBlock(8, 160, 1280, eps=1e-6),
+                TemporalBlock(8, 160, 1280, eps=1e-6),
+                TemporalBlock(8, 160, 1280, eps=1e-6),
+                TemporalBlock(8, 160, 1280, eps=1e-6),
+                TemporalBlock(8, 160, 1280, eps=1e-6),
+                TemporalBlock(8, 160, 1280, eps=1e-6),
+                TemporalBlock(8, 160, 1280, eps=1e-6),
+                TemporalBlock(8, 160, 1280, eps=1e-6),
+                TemporalBlock(8, 160, 1280, eps=1e-6),
+                TemporalBlock(8, 80, 640, eps=1e-6),
+                TemporalBlock(8, 80, 640, eps=1e-6),
+                TemporalBlock(8, 80, 640, eps=1e-6),
+                TemporalBlock(8, 40, 320, eps=1e-6),
+                TemporalBlock(8, 40, 320, eps=1e-6),
+                TemporalBlock(8, 40, 320, eps=1e-6),
+            ])
+            self.call_block_id = {
+                1: 0,
+                4: 1,
+                9: 2,
+                12: 3,
+                17: 4,
+                20: 5,
+                24: 6,
+                26: 7,
+                29: 8,
+                32: 9,
+                34: 10,
+                36: 11,
+                40: 12,
+                43: 13,
+                46: 14,
+                50: 15,
+                53: 16,
+                56: 17,
+                60: 18,
+                63: 19,
+                66: 20
+            }
+        else:
+            self.motion_modules = torch.nn.ModuleList([
+                TemporalBlock(8, 40, 320, eps=1e-6),
+                TemporalBlock(8, 40, 320, eps=1e-6),
+                TemporalBlock(8, 80, 640, eps=1e-6),
+                TemporalBlock(8, 80, 640, eps=1e-6),
+                TemporalBlock(8, 160, 1280, eps=1e-6),
+                TemporalBlock(8, 160, 1280, eps=1e-6),
+                TemporalBlock(8, 160, 1280, eps=1e-6),
+                TemporalBlock(8, 160, 1280, eps=1e-6),
+                TemporalBlock(8, 160, 1280, eps=1e-6),
+                TemporalBlock(8, 160, 1280, eps=1e-6),
+                TemporalBlock(8, 160, 1280, eps=1e-6),
+                TemporalBlock(8, 160, 1280, eps=1e-6),
+                TemporalBlock(8, 160, 1280, eps=1e-6),
+                TemporalBlock(8, 160, 1280, eps=1e-6),
+                TemporalBlock(8, 80, 640, eps=1e-6),
+                TemporalBlock(8, 80, 640, eps=1e-6),
+                TemporalBlock(8, 80, 640, eps=1e-6),
+                TemporalBlock(8, 40, 320, eps=1e-6),
+                TemporalBlock(8, 40, 320, eps=1e-6),
+                TemporalBlock(8, 40, 320, eps=1e-6),
+            ])
+            self.call_block_id = {
+                1: 0,
+                4: 1,
+                9: 2,
+                12: 3,
+                17: 4,
+                20: 5,
+                24: 6,
+                26: 7,
+                32: 8,
+                34: 9,
+                36: 10,
+                40: 11,
+                43: 12,
+                46: 13,
+                50: 14,
+                53: 15,
+                56: 16,
+                60: 17,
+                63: 18,
+                66: 19
+            }
+
     def forward(self):
         pass
 
-    def state_dict_converter(self):
+    @staticmethod
+    def state_dict_converter():
         return SDMotionModelStateDictConverter()
 
 
@@ -152,7 +199,7 @@ class SDMotionModelStateDictConverter:
     def __init__(self):
         pass
 
-    def from_diffusers(self, state_dict):
+    def from_diffusers(self, state_dict, mm_v3=True):
         rename_dict = {
             "norm": "norm",
             "proj_in": "proj_in",
@@ -174,7 +221,8 @@ class SDMotionModelStateDictConverter:
             "proj_out": "proj_out",
         }
         name_list = sorted([i for i in state_dict if i.startswith("down_blocks.")])
-        name_list += sorted([i for i in state_dict if i.startswith("mid_block.")])
+        if not mm_v3:
+            name_list += sorted([i for i in state_dict if i.startswith("mid_block.")])
         name_list += sorted([i for i in state_dict if i.startswith("up_blocks.")])
         state_dict_ = {}
         last_prefix, module_id = "", -1
@@ -193,6 +241,6 @@ class SDMotionModelStateDictConverter:
                 rename = ".".join(["motion_modules", str(module_id), rename_dict[middle_name], suffix])
             state_dict_[rename] = state_dict[name]
         return state_dict_
-    
-    def from_civitai(self, state_dict):
-        return self.from_diffusers(state_dict)
+
+    def from_civitai(self, state_dict, mm_v3=True):
+        return self.from_diffusers(state_dict, mm_v3)

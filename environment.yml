@@ -19,3 +19,4 @@ dependencies:
     - safetensors
     - einops
     - sentencepiece
+    - numpy==1.22.4

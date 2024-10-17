@@ -1,6 +1,11 @@
-from .stable_diffusion import SDImagePipeline
-from .stable_diffusion_xl import SDXLImagePipeline
-from .stable_diffusion_video import SDVideoPipeline, SDVideoPipelineRunner
-from .stable_diffusion_xl_video import SDXLVideoPipeline
-from .stable_video_diffusion import SVDVideoPipeline
-from .hunyuan_dit import HunyuanDiTImagePipeline
+from .sd_image import SDImagePipeline
+from .sd_video import SDVideoPipeline
+from .sdxl_image import SDXLImagePipeline
+from .sdxl_video import SDXLVideoPipeline
+from .sd3_image import SD3ImagePipeline
+from .hunyuan_image import HunyuanDiTImagePipeline
+from .svd_video import SVDVideoPipeline
+from .flux_image import FluxImagePipeline
+from .cog_video import CogVideoPipeline
+from .pipeline_runner import SDVideoPipelineRunner, SDImagePipelineRunner
+KolorsImagePipeline = SDXLImagePipeline
