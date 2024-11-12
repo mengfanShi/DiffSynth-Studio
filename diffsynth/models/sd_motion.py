@@ -50,8 +50,8 @@ class TemporalTransformerBlock(torch.nn.Module):
 
 
 class TemporalBlock(torch.nn.Module):
-
-    def __init__(self, num_attention_heads, attention_head_dim, in_channels, num_layers=1, norm_num_groups=32, eps=1e-5):
+    
+    def __init__(self, num_attention_heads, attention_head_dim, in_channels, num_layers=1, norm_num_groups=32, eps=1e-5, max_position_embeddings=32):
         super().__init__()
         inner_dim = num_attention_heads * attention_head_dim
 
@@ -62,7 +62,8 @@ class TemporalBlock(torch.nn.Module):
             TemporalTransformerBlock(
                 inner_dim,
                 num_attention_heads,
-                attention_head_dim
+                attention_head_dim,
+                max_position_embeddings=max_position_embeddings,
             )
             for d in range(num_layers)
         ])
@@ -92,79 +93,89 @@ class TemporalBlock(torch.nn.Module):
 
 
 class SDMotionModel(torch.nn.Module):
-    def __init__(self, mm_v3=True):
+    def __init__(self,max_position_embeddings=32):
         super().__init__()
-        if not mm_v3:
-            self.motion_modules = torch.nn.ModuleList([
-                TemporalBlock(8, 40, 320, eps=1e-6),
-                TemporalBlock(8, 40, 320, eps=1e-6),
-                TemporalBlock(8, 80, 640, eps=1e-6),
-                TemporalBlock(8, 80, 640, eps=1e-6),
-                TemporalBlock(8, 160, 1280, eps=1e-6),
-                TemporalBlock(8, 160, 1280, eps=1e-6),
-                TemporalBlock(8, 160, 1280, eps=1e-6),
-                TemporalBlock(8, 160, 1280, eps=1e-6),
-                TemporalBlock(8, 160, 1280, eps=1e-6),
-                TemporalBlock(8, 160, 1280, eps=1e-6),
-                TemporalBlock(8, 160, 1280, eps=1e-6),
-                TemporalBlock(8, 160, 1280, eps=1e-6),
-                TemporalBlock(8, 160, 1280, eps=1e-6),
-                TemporalBlock(8, 160, 1280, eps=1e-6),
-                TemporalBlock(8, 160, 1280, eps=1e-6),
-                TemporalBlock(8, 80, 640, eps=1e-6),
-                TemporalBlock(8, 80, 640, eps=1e-6),
-                TemporalBlock(8, 80, 640, eps=1e-6),
-                TemporalBlock(8, 40, 320, eps=1e-6),
-                TemporalBlock(8, 40, 320, eps=1e-6),
-                TemporalBlock(8, 40, 320, eps=1e-6),
+        self.motion_modules = torch.nn.ModuleList([
+            TemporalBlock(8, 40, 320, eps=1e-6, max_position_embeddings=max_position_embeddings),
+            TemporalBlock(8, 40, 320, eps=1e-6, max_position_embeddings=max_position_embeddings),
+            TemporalBlock(8, 80, 640, eps=1e-6, max_position_embeddings=max_position_embeddings),
+            TemporalBlock(8, 80, 640, eps=1e-6, max_position_embeddings=max_position_embeddings),
+            TemporalBlock(8, 160, 1280, eps=1e-6, max_position_embeddings=max_position_embeddings),
+            TemporalBlock(8, 160, 1280, eps=1e-6, max_position_embeddings=max_position_embeddings),
+            TemporalBlock(8, 160, 1280, eps=1e-6, max_position_embeddings=max_position_embeddings),
+            TemporalBlock(8, 160, 1280, eps=1e-6, max_position_embeddings=max_position_embeddings),
+            TemporalBlock(8, 160, 1280, eps=1e-6, max_position_embeddings=max_position_embeddings),
+            TemporalBlock(8, 160, 1280, eps=1e-6, max_position_embeddings=max_position_embeddings),
+            TemporalBlock(8, 160, 1280, eps=1e-6, max_position_embeddings=max_position_embeddings),
+            TemporalBlock(8, 160, 1280, eps=1e-6, max_position_embeddings=max_position_embeddings),
+            TemporalBlock(8, 160, 1280, eps=1e-6, max_position_embeddings=max_position_embeddings),
+            TemporalBlock(8, 160, 1280, eps=1e-6, max_position_embeddings=max_position_embeddings),
+            TemporalBlock(8, 160, 1280, eps=1e-6, max_position_embeddings=max_position_embeddings),
+            TemporalBlock(8, 80, 640, eps=1e-6, max_position_embeddings=max_position_embeddings),
+            TemporalBlock(8, 80, 640, eps=1e-6, max_position_embeddings=max_position_embeddings),
+            TemporalBlock(8, 80, 640, eps=1e-6, max_position_embeddings=max_position_embeddings),
+            TemporalBlock(8, 40, 320, eps=1e-6, max_position_embeddings=max_position_embeddings),
+            TemporalBlock(8, 40, 320, eps=1e-6, max_position_embeddings=max_position_embeddings),
+            TemporalBlock(8, 40, 320, eps=1e-6, max_position_embeddings=max_position_embeddings),
+        ])
+        self.call_block_id = {
+            1: 0,
+            4: 1,
+            9: 2,
+            12: 3,
+            17: 4,
+            20: 5,
+            24: 6,
+            26: 7,
+            29: 8,
+            32: 9,
+            34: 10,
+            36: 11,
+            40: 12,
+            43: 13,
+            46: 14,
+            50: 15,
+            53: 16,
+            56: 17,
+            60: 18,
+            63: 19,
+            66: 20
+        }
+        
+    def forward(self):
+        pass
+
+    @staticmethod
+    def state_dict_converter():
+        return SDMotionModelStateDictConverter()
+
+
+class SDMotionModel_V3(torch.nn.Module):
+    def __init__(self, max_position_embeddings=32):
+        super().__init__()
+        self.motion_modules = torch.nn.ModuleList([
+                TemporalBlock(8, 40, 320, eps=1e-6, max_position_embeddings=max_position_embeddings),
+                TemporalBlock(8, 40, 320, eps=1e-6, max_position_embeddings=max_position_embeddings),
+                TemporalBlock(8, 80, 640, eps=1e-6, max_position_embeddings=max_position_embeddings),
+                TemporalBlock(8, 80, 640, eps=1e-6, max_position_embeddings=max_position_embeddings),
+                TemporalBlock(8, 160, 1280, eps=1e-6, max_position_embeddings=max_position_embeddings),
+                TemporalBlock(8, 160, 1280, eps=1e-6, max_position_embeddings=max_position_embeddings),
+                TemporalBlock(8, 160, 1280, eps=1e-6, max_position_embeddings=max_position_embeddings),
+                TemporalBlock(8, 160, 1280, eps=1e-6, max_position_embeddings=max_position_embeddings),
+                TemporalBlock(8, 160, 1280, eps=1e-6, max_position_embeddings=max_position_embeddings),
+                TemporalBlock(8, 160, 1280, eps=1e-6, max_position_embeddings=max_position_embeddings),
+                TemporalBlock(8, 160, 1280, eps=1e-6, max_position_embeddings=max_position_embeddings),
+                TemporalBlock(8, 160, 1280, eps=1e-6, max_position_embeddings=max_position_embeddings),
+                TemporalBlock(8, 160, 1280, eps=1e-6, max_position_embeddings=max_position_embeddings),
+                TemporalBlock(8, 160, 1280, eps=1e-6, max_position_embeddings=max_position_embeddings),
+                TemporalBlock(8, 80, 640, eps=1e-6, max_position_embeddings=max_position_embeddings),
+                TemporalBlock(8, 80, 640, eps=1e-6, max_position_embeddings=max_position_embeddings),
+                TemporalBlock(8, 80, 640, eps=1e-6, max_position_embeddings=max_position_embeddings),
+                TemporalBlock(8, 40, 320, eps=1e-6, max_position_embeddings=max_position_embeddings),
+                TemporalBlock(8, 40, 320, eps=1e-6, max_position_embeddings=max_position_embeddings),
+                TemporalBlock(8, 40, 320, eps=1e-6, max_position_embeddings=max_position_embeddings),
             ])
-            self.call_block_id = {
-                1: 0,
-                4: 1,
-                9: 2,
-                12: 3,
-                17: 4,
-                20: 5,
-                24: 6,
-                26: 7,
-                29: 8,
-                32: 9,
-                34: 10,
-                36: 11,
-                40: 12,
-                43: 13,
-                46: 14,
-                50: 15,
-                53: 16,
-                56: 17,
-                60: 18,
-                63: 19,
-                66: 20
-            }
-        else:
-            self.motion_modules = torch.nn.ModuleList([
-                TemporalBlock(8, 40, 320, eps=1e-6),
-                TemporalBlock(8, 40, 320, eps=1e-6),
-                TemporalBlock(8, 80, 640, eps=1e-6),
-                TemporalBlock(8, 80, 640, eps=1e-6),
-                TemporalBlock(8, 160, 1280, eps=1e-6),
-                TemporalBlock(8, 160, 1280, eps=1e-6),
-                TemporalBlock(8, 160, 1280, eps=1e-6),
-                TemporalBlock(8, 160, 1280, eps=1e-6),
-                TemporalBlock(8, 160, 1280, eps=1e-6),
-                TemporalBlock(8, 160, 1280, eps=1e-6),
-                TemporalBlock(8, 160, 1280, eps=1e-6),
-                TemporalBlock(8, 160, 1280, eps=1e-6),
-                TemporalBlock(8, 160, 1280, eps=1e-6),
-                TemporalBlock(8, 160, 1280, eps=1e-6),
-                TemporalBlock(8, 80, 640, eps=1e-6),
-                TemporalBlock(8, 80, 640, eps=1e-6),
-                TemporalBlock(8, 80, 640, eps=1e-6),
-                TemporalBlock(8, 40, 320, eps=1e-6),
-                TemporalBlock(8, 40, 320, eps=1e-6),
-                TemporalBlock(8, 40, 320, eps=1e-6),
-            ])
-            self.call_block_id = {
+        self.call_block_id = {
                 1: 0,
                 4: 1,
                 9: 2,
@@ -186,7 +197,7 @@ class SDMotionModel(torch.nn.Module):
                 63: 18,
                 66: 19
             }
-
+        
     def forward(self):
         pass
 
@@ -199,7 +210,7 @@ class SDMotionModelStateDictConverter:
     def __init__(self):
         pass
 
-    def from_diffusers(self, state_dict, mm_v3=True):
+    def from_diffusers(self, state_dict, mm_v3=False):
         rename_dict = {
             "norm": "norm",
             "proj_in": "proj_in",
@@ -241,6 +252,6 @@ class SDMotionModelStateDictConverter:
                 rename = ".".join(["motion_modules", str(module_id), rename_dict[middle_name], suffix])
             state_dict_[rename] = state_dict[name]
         return state_dict_
-
-    def from_civitai(self, state_dict, mm_v3=True):
+    
+    def from_civitai(self, state_dict, mm_v3=False):
         return self.from_diffusers(state_dict, mm_v3)

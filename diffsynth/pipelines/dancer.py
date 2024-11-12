@@ -21,11 +21,11 @@ def lets_dance(
     tile_stride=32,
     device = "cuda",
     vram_limit_level = 0,
+    batch_size = 1,
 ):
     # 0. Text embedding alignment (only for video processing)
     if encoder_hidden_states.shape[0] != sample.shape[0]:
         encoder_hidden_states = encoder_hidden_states.repeat(sample.shape[0], 1, 1, 1)
-
     # 1. ControlNet
     #     This part will be repeated on overlapping frames if animatediff_batch_size > animatediff_stride.
     #     I leave it here because I intend to do something interesting on the ControlNets.
@@ -54,7 +54,7 @@ def lets_dance(
         additional_res_stack = None
 
     # 2. time
-    time_emb = unet.time_proj(timestep).to(sample.dtype)
+    time_emb = unet.time_proj(timestep).to(sample.dtype).to(device)
     time_emb = unet.time_embedding(time_emb)
 
     # 3. pre-process
@@ -96,7 +96,7 @@ def lets_dance(
                 motion_module_id = motion_modules.call_block_id[block_id]
                 hidden_states, time_emb, text_emb, res_stack = motion_modules.motion_modules[motion_module_id](
                     hidden_states, time_emb, text_emb, res_stack,
-                    batch_size=1
+                    batch_size=batch_size
                 )
         # 4.3 ControlNet
         if block_id == controlnet_insert_block_id and additional_res_stack is not None:
@@ -112,8 +112,6 @@ def lets_dance(
     hidden_states = unet.conv_out(hidden_states)
 
     return hidden_states
-
-
 
 
 def lets_dance_xl(
@@ -154,8 +152,8 @@ def lets_dance_xl(
                 timestep,
                 encoder_hidden_states[batch_id: batch_id_],
                 controlnet_frames[:, batch_id: batch_id_],
-                add_time_id=add_time_id,
-                add_text_embeds=add_text_embeds,
+                add_time_id=add_time_id[6*batch_id: 6*batch_id_],
+                add_text_embeds=add_text_embeds[batch_id: batch_id_],
                 tiled=tiled, tile_size=tile_size, tile_stride=tile_stride,
                 unet=unet, # for Kolors, some modules in ControlNets will be replaced.
             )

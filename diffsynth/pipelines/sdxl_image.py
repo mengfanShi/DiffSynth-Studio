@@ -5,12 +5,12 @@ from ..controlnets import MultiControlNetManager, ControlNetUnit, ControlNetConf
 from ..prompters import SDXLPrompter, KolorsPrompter
 from ..schedulers import EnhancedDDIMScheduler
 from .base import BasePipeline
+from ..data import center_crop
 from .dancer import lets_dance_xl
 from typing import List
 import torch
 from tqdm import tqdm
 from einops import repeat
-
 
 
 class SDXLImagePipeline(BasePipeline):
@@ -31,10 +31,8 @@ class SDXLImagePipeline(BasePipeline):
         self.ipadapter: SDXLIpAdapter = None
         self.model_names = ['text_encoder', 'text_encoder_2', 'text_encoder_kolors', 'unet', 'vae_decoder', 'vae_encoder', 'controlnet', 'ipadapter_image_encoder', 'ipadapter']
 
-
     def denoising_model(self):
         return self.unet
-
 
     def fetch_models(self, model_manager: ModelManager, controlnet_config_units: List[ControlNetConfigUnit]=[], prompt_refiner_classes=[]):
         # Main models
@@ -70,7 +68,6 @@ class SDXLImagePipeline(BasePipeline):
             self.prompter.fetch_models(self.text_encoder, self.text_encoder_2)
         self.prompter.load_prompt_refiners(model_manager, prompt_refiner_classes)
 
-
     @staticmethod
     def from_model_manager(model_manager: ModelManager, controlnet_config_units: List[ControlNetConfigUnit]=[], prompt_refiner_classes=[], device=None):
         pipe = SDXLImagePipeline(
@@ -80,18 +77,15 @@ class SDXLImagePipeline(BasePipeline):
         pipe.fetch_models(model_manager, controlnet_config_units, prompt_refiner_classes)
         return pipe
     
-
     def encode_image(self, image, tiled=False, tile_size=64, tile_stride=32):
         latents = self.vae_encoder(image, tiled=tiled, tile_size=tile_size, tile_stride=tile_stride)
         return latents
     
-
     def decode_image(self, latent, tiled=False, tile_size=64, tile_stride=32):
         image = self.vae_decoder(latent.to(self.device), tiled=tiled, tile_size=tile_size, tile_stride=tile_stride)
         image = self.vae_output_to_image(image)
         return image
     
-
     def encode_prompt(self, prompt, clip_skip=1, clip_skip_2=2, positive=True):
         add_prompt_emb, prompt_emb = self.prompter.encode_prompt(
             prompt,
@@ -101,10 +95,10 @@ class SDXLImagePipeline(BasePipeline):
         )
         return {"encoder_hidden_states": prompt_emb, "add_text_embeds": add_prompt_emb}
     
-
     def prepare_extra_input(self, latents=None):
         height, width = latents.shape[2] * 8, latents.shape[3] * 8
         add_time_id = torch.tensor([height, width, 0, 0, height, width], device=self.device).repeat(latents.shape[0])
+        # add_time_id = torch.tensor([height, width, 0, 0, height, width], device=self.device).repeat(16)
         return {"add_time_id": add_time_id}
     
 
@@ -134,6 +128,8 @@ class SDXLImagePipeline(BasePipeline):
         seed=None,
         progress_bar_cmd=tqdm,
         progress_bar_st=None,
+        original_width=None,
+        original_height=None,
     ):
         # Tiler parameters
         tiler_kwargs = {"tiled": tiled, "tile_size": tile_size, "tile_stride": tile_stride}
@@ -218,6 +214,9 @@ class SDXLImagePipeline(BasePipeline):
         # Decode image
         self.load_models_to_device(['vae_decoder'])
         image = self.decode_image(latents, tiled=tiled, tile_size=tile_size, tile_stride=tile_stride)
+
+        if original_width is not None and original_height is not None:
+            image = center_crop(image, original_height, original_width)
 
         # offload all models
         self.load_models_to_device([])

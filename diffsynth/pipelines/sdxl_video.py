@@ -4,12 +4,70 @@ from ..models.model_manager import ModelManager
 from ..controlnets import MultiControlNetManager, ControlNetUnit, ControlNetConfigUnit, Annotator
 from ..prompters import SDXLPrompter, KolorsPrompter
 from ..schedulers import EnhancedDDIMScheduler
+from ..data import center_crop
 from .sdxl_image import SDXLImagePipeline
 from .dancer import lets_dance_xl
 from typing import List
 import torch
 from tqdm import tqdm
 
+
+def lets_dance_XL_with_long_video(
+    unet: SDXLUNet,
+    motion_modules: SDXLMotionModel = None,
+    controlnet: MultiControlNetManager = None,
+    sample = None,
+    add_time_id = None,
+    add_text_embeds = None,
+    timestep = None,
+    encoder_hidden_states = None,
+    ipadapter_kwargs_list = {},
+    controlnet_frames = None,
+    unet_batch_size = 1,
+    controlnet_batch_size = 1,
+    cross_frame_attention = False,
+    tiled=False,
+    tile_size=64,
+    tile_stride=32,
+    device = "cuda",
+    animatediff_batch_size=16,
+    animatediff_stride=8,
+    vram_limit_level = 0,
+):
+    num_frames = sample.shape[0]
+    hidden_states_output = [(torch.zeros(sample[0].shape, dtype=sample[0].dtype), 0) for i in range(num_frames)]
+
+    for batch_id in range(0, num_frames, animatediff_stride):
+        batch_id_ = min(batch_id + animatediff_batch_size, num_frames)
+        if batch_id_ == num_frames:
+            batch_id = max(num_frames - animatediff_batch_size, 0)
+
+        hidden_states_batch = lets_dance_xl(
+            unet, motion_modules, controlnet,
+            sample=sample[batch_id: batch_id_].to(device),
+            add_time_id=add_time_id,
+            add_text_embeds=add_text_embeds,
+            timestep=timestep,
+            encoder_hidden_states=encoder_hidden_states,
+            ipadapter_kwargs_list=ipadapter_kwargs_list,
+            controlnet_frames=controlnet_frames[:, batch_id: batch_id_].to(device) if controlnet_frames is not None else None,
+            unet_batch_size=unet_batch_size, controlnet_batch_size=controlnet_batch_size,
+            cross_frame_attention=cross_frame_attention,
+            tiled=tiled, tile_size=tile_size, tile_stride=tile_stride, device=device, vram_limit_level=vram_limit_level
+        ).cpu()
+
+        for i, hidden_states_updated in zip(range(batch_id, batch_id_), hidden_states_batch):
+            bias = max(1 - abs(i - (batch_id + batch_id_ - 1) / 2) / ((batch_id_ - batch_id - 1 + 1e-2) / 2), 1e-2)
+            hidden_states, num = hidden_states_output[i]
+            hidden_states = hidden_states * (num / (num + bias)) + hidden_states_updated * (bias / (num + bias))
+            hidden_states_output[i] = (hidden_states, num + bias)
+
+        if batch_id_ == num_frames:
+            break
+
+    # output
+    hidden_states = torch.stack([h for h, _ in hidden_states_output])
+    return hidden_states
 
 
 class SDXLVideoPipeline(SDXLImagePipeline):
@@ -42,7 +100,16 @@ class SDXLVideoPipeline(SDXLImagePipeline):
         self.prompter.fetch_models(self.text_encoder)
         self.prompter.load_prompt_refiners(model_manager, prompt_refiner_classes)
 
-        # ControlNets (TODO)
+        # ControlNets
+        controlnet_units = []
+        for config in controlnet_config_units:
+            controlnet_unit = ControlNetUnit(
+                Annotator(config.processor_id, device=self.device),
+                model_manager.fetch_model("sdxl_controlnet", config.model_path),
+                config.scale
+            )
+            controlnet_units.append(controlnet_unit)
+        self.controlnet = MultiControlNetManager(controlnet_units)
 
         # IP-Adapters
         self.ipadapter = model_manager.fetch_model("sdxl_ipadapter")
@@ -74,7 +141,6 @@ class SDXLVideoPipeline(SDXLImagePipeline):
         pipe.fetch_models(model_manager, controlnet_config_units, prompt_refiner_classes)
         return pipe
     
-
     def decode_video(self, latents, tiled=False, tile_size=64, tile_stride=32):
         images = [
             self.decode_image(latents[frame_id: frame_id+1], tiled=tiled, tile_size=tile_size, tile_stride=tile_stride)
@@ -82,7 +148,6 @@ class SDXLVideoPipeline(SDXLImagePipeline):
         ]
         return images
     
-
     def encode_video(self, processed_images, tiled=False, tile_size=64, tile_stride=32):
         latents = []
         for image in processed_images:
@@ -91,7 +156,6 @@ class SDXLVideoPipeline(SDXLImagePipeline):
             latents.append(latent.cpu())
         latents = torch.concat(latents, dim=0)
         return latents
-    
 
     @torch.no_grad()
     def __call__(
@@ -121,11 +185,20 @@ class SDXLVideoPipeline(SDXLImagePipeline):
         tile_size=64,
         tile_stride=32,
         seed=None,
+        vram_limit_level=0,
         progress_bar_cmd=tqdm,
         progress_bar_st=None,
+        original_width=None,
+        original_height=None,
     ):
         # Tiler parameters, batch size ...
         tiler_kwargs = {"tiled": tiled, "tile_size": tile_size, "tile_stride": tile_stride}
+
+        other_kwargs = {
+            "animatediff_batch_size": animatediff_batch_size, "animatediff_stride": animatediff_stride,
+            "unet_batch_size": unet_batch_size, "controlnet_batch_size": controlnet_batch_size,
+            "cross_frame_attention": cross_frame_attention, "vram_limit_level": vram_limit_level,
+        }
 
         # Prepare scheduler
         self.scheduler.set_timesteps(num_inference_steps, denoising_strength)
@@ -140,7 +213,7 @@ class SDXLVideoPipeline(SDXLImagePipeline):
         else:
             latents = self.encode_video(input_frames, **tiler_kwargs)
             latents = self.scheduler.add_noise(latents, noise, timestep=self.scheduler.timesteps[0])
-        latents = latents.to(self.device) # will be deleted for supporting long videos
+        # latents = latents.to(self.device) # will be deleted for supporting long videos
 
         # Encode prompts
         prompt_emb_posi = self.encode_prompt(prompt, clip_skip=clip_skip, positive=True)
@@ -187,14 +260,14 @@ class SDXLVideoPipeline(SDXLImagePipeline):
             timestep = timestep.unsqueeze(0).to(self.device)
 
             # Classifier-free guidance
-            noise_pred_posi = lets_dance_xl(
-                self.unet, motion_modules=self.motion_modules, controlnet=None,
+            noise_pred_posi = lets_dance_XL_with_long_video(
+                self.unet, motion_modules=self.motion_modules, controlnet=self.controlnet,
                 sample=latents, timestep=timestep,
                 **prompt_emb_posi, **controlnet_kwargs, **ipadapter_kwargs_list_posi, **extra_input, **tiler_kwargs,
                 device=self.device,
             )
-            noise_pred_nega = lets_dance_xl(
-                self.unet, motion_modules=self.motion_modules, controlnet=None,
+            noise_pred_nega = lets_dance_XL_with_long_video(
+                self.unet, motion_modules=self.motion_modules, controlnet=self.controlnet,
                 sample=latents, timestep=timestep,
                 **prompt_emb_nega, **controlnet_kwargs, **ipadapter_kwargs_list_nega, **extra_input, **tiler_kwargs,
                 device=self.device,
@@ -220,5 +293,8 @@ class SDXLVideoPipeline(SDXLImagePipeline):
         # Post-process
         if smoother is not None and (num_inference_steps in smoother_progress_ids or -1 in smoother_progress_ids):
             output_frames = smoother(output_frames, original_frames=input_frames)
+
+        if original_width is not None and original_height is not None:
+            output_frames = [center_crop(output_frame, original_height, original_width) for output_frame in output_frames]
 
         return output_frames

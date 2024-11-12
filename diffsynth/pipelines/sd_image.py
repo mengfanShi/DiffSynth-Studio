@@ -4,9 +4,10 @@ from ..controlnets import MultiControlNetManager, ControlNetUnit, ControlNetConf
 from ..prompters import SDPrompter
 from ..schedulers import EnhancedDDIMScheduler
 from .base import BasePipeline
+from ..data import VideoData ,center_crop
 from .dancer import lets_dance
 from typing import List
-import torch
+import torch, os
 from tqdm import tqdm
 
 
@@ -111,6 +112,8 @@ class SDImagePipeline(BasePipeline):
         seed=None,
         progress_bar_cmd=tqdm,
         progress_bar_st=None,
+        original_width=None,
+        original_height=None,
     ):
         # Tiler parameters
         tiler_kwargs = {"tiled": tiled, "tile_size": tile_size, "tile_stride": tile_stride}
@@ -184,6 +187,11 @@ class SDImagePipeline(BasePipeline):
         self.load_models_to_device(['vae_decoder'])
         image = self.decode_image(latents, tiled=tiled, tile_size=tile_size, tile_stride=tile_stride)
 
+        if original_width is not None and original_height is not None:
+            image = center_crop(image, original_height, original_width)
+
         # offload all models
         self.load_models_to_device([])
+
         return image
+

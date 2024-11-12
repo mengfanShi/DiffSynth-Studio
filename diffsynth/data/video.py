@@ -7,7 +7,6 @@ from tqdm import tqdm
 class LowMemoryVideo:
     def __init__(self, file_name):
         self.reader = imageio.get_reader(file_name)
-    
     def __len__(self):
         return self.reader.count_frames()
 
@@ -51,7 +50,6 @@ class LowMemoryImageFolder:
             self.file_list = search_for_images(folder)
         else:
             self.file_list = [os.path.join(folder, file_name) for file_name in file_list]
-    
     def __len__(self):
         return len(self.file_list)
 
@@ -78,8 +76,38 @@ def crop_and_resize(image, height, width):
     return image
 
 
+def resize_with_padding(image, height, width):
+    image = np.array(image)
+    image_height, image_width, _ = image.shape
+    
+    scale = min(width / image_width, height / image_height)
+    new_width = int(image_width * scale)
+    new_height = int(image_height * scale)
+    resized_image = Image.fromarray(image).resize((new_width, new_height))
+    
+    new_image = Image.new("RGB", (width, height), (0, 0, 0))
+
+    paste_x = (width - new_width) // 2
+    paste_y = (height - new_height) // 2
+    new_image.paste(resized_image, (paste_x, paste_y))
+    
+    return new_image
+
+
+def center_crop(image, target_height, target_width):
+    image = np.array(image)
+    image_height, image_width, _ = image.shape
+
+    start_x = (image_width - target_width) // 2
+    start_y = (image_height - target_height) // 2
+
+    cropped_image = image[start_y:start_y + target_height, start_x:start_x + target_width]
+    
+    return Image.fromarray(cropped_image)
+
+
 class VideoData:
-    def __init__(self, video_file=None, image_folder=None, height=None, width=None, **kwargs):
+    def __init__(self, video_file=None, image_folder=None, height=None, width=None, crop_method=None, **kwargs):
         if video_file is not None:
             self.data_type = "video"
             self.data = LowMemoryVideo(video_file, **kwargs)
@@ -90,6 +118,7 @@ class VideoData:
             raise ValueError("Cannot open video or image folder")
         self.length = None
         self.set_shape(height, width)
+        self.crop_method = crop_method
 
     def raw_data(self):
         frames = []
@@ -122,7 +151,10 @@ class VideoData:
         width, height = frame.size
         if self.height is not None and self.width is not None:
             if self.height != height or self.width != width:
-                frame = crop_and_resize(frame, self.height, self.width)
+                if self.crop_method == "padding":
+                    frame = resize_with_padding(frame, self.height, self.width)
+                else:
+                    frame = crop_and_resize(frame, self.height, self.width)
         return frame
 
     def __del__(self):
@@ -142,7 +174,9 @@ def save_video(frames, save_path, fps, quality=9):
         writer.append_data(frame)
     writer.close()
 
-def save_frames(frames, save_path):
+def save_frames(frames, save_path, topn=None):
     os.makedirs(save_path, exist_ok=True)
     for i, frame in enumerate(tqdm(frames, desc="Saving images")):
+        if topn is not None and i > int(topn) - 1:
+            break
         frame.save(os.path.join(save_path, f"{i}.png"))

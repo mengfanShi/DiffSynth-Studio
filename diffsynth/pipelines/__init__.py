@@ -7,5 +7,5 @@ from .hunyuan_image import HunyuanDiTImagePipeline
 from .svd_video import SVDVideoPipeline
 from .flux_image import FluxImagePipeline
 from .cog_video import CogVideoPipeline
-from .pipeline_runner import SDVideoPipelineRunner, SDImagePipelineRunner
+from .pipeline_runner import SDVideoPipelineRunner, SDImagePipelineRunner, SDXLVideoPipelineRunner, SDXLImagePipelineRunner
 KolorsImagePipeline = SDXLImagePipeline

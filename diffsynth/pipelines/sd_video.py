@@ -3,12 +3,12 @@ from ..models.model_manager import ModelManager
 from ..controlnets import MultiControlNetManager, ControlNetUnit, ControlNetConfigUnit, Annotator
 from ..prompters import SDPrompter
 from ..schedulers import EnhancedDDIMScheduler
+from ..data import center_crop
 from .sd_image import SDImagePipeline
 from .dancer import lets_dance
 from typing import List
 import torch
 from tqdm import tqdm
-
 
 
 def lets_dance_with_long_video(
@@ -29,12 +29,16 @@ def lets_dance_with_long_video(
     device="cuda",
     animatediff_batch_size=16,
     animatediff_stride=8,
+    vram_limit_level = 0,
 ):
     num_frames = sample.shape[0]
     hidden_states_output = [(torch.zeros(sample[0].shape, dtype=sample[0].dtype), 0) for i in range(num_frames)]
 
     for batch_id in range(0, num_frames, animatediff_stride):
         batch_id_ = min(batch_id + animatediff_batch_size, num_frames)
+        if batch_id_ == num_frames:
+            batch_id = max(num_frames - animatediff_batch_size, 0)
+
 
         # process this batch
         hidden_states_batch = lets_dance(
@@ -46,7 +50,7 @@ def lets_dance_with_long_video(
             controlnet_frames=controlnet_frames[:, batch_id: batch_id_].to(device) if controlnet_frames is not None else None,
             unet_batch_size=unet_batch_size, controlnet_batch_size=controlnet_batch_size,
             cross_frame_attention=cross_frame_attention,
-            tiled=tiled, tile_size=tile_size, tile_stride=tile_stride, device=device
+            tiled=tiled, tile_size=tile_size, tile_stride=tile_stride, device=device, vram_limit_level=vram_limit_level
         ).cpu()
 
         # update hidden_states
@@ -62,7 +66,6 @@ def lets_dance_with_long_video(
     # output
     hidden_states = torch.stack([h for h, _ in hidden_states_output])
     return hidden_states
-
 
 
 class SDVideoPipeline(SDImagePipeline):
@@ -81,7 +84,6 @@ class SDVideoPipeline(SDImagePipeline):
         self.ipadapter: SDIpAdapter = None
         self.motion_modules: SDMotionModel = None
 
-
     def fetch_models(self, model_manager: ModelManager, controlnet_config_units: List[ControlNetConfigUnit]=[], prompt_refiner_classes=[]):
         # Main models
         self.text_encoder = model_manager.fetch_model("sd_text_encoder")
@@ -96,7 +98,7 @@ class SDVideoPipeline(SDImagePipeline):
         for config in controlnet_config_units:
             controlnet_unit = ControlNetUnit(
                 Annotator(config.processor_id, device=self.device),
-                model_manager.fetch_model("sd_controlnet", config.model_path),
+                model_manager.fetch_model("sd_controlnet", config.model_path).to(self.device),
                 config.scale
             )
             controlnet_units.append(controlnet_unit)
@@ -111,7 +113,6 @@ class SDVideoPipeline(SDImagePipeline):
         if self.motion_modules is None:
             self.scheduler = EnhancedDDIMScheduler(beta_schedule="scaled_linear")
 
-
     @staticmethod
     def from_model_manager(model_manager: ModelManager, controlnet_config_units: List[ControlNetConfigUnit]=[], prompt_refiner_classes=[]):
         pipe = SDVideoPipeline(
@@ -121,7 +122,6 @@ class SDVideoPipeline(SDImagePipeline):
         pipe.fetch_models(model_manager, controlnet_config_units, prompt_refiner_classes)
         return pipe
     
-
     def decode_video(self, latents, tiled=False, tile_size=64, tile_stride=32):
         images = [
             self.decode_image(latents[frame_id: frame_id+1], tiled=tiled, tile_size=tile_size, tile_stride=tile_stride)
@@ -129,7 +129,6 @@ class SDVideoPipeline(SDImagePipeline):
         ]
         return images
     
-
     def encode_video(self, processed_images, tiled=False, tile_size=64, tile_stride=32):
         latents = []
         for image in processed_images:
@@ -139,6 +138,13 @@ class SDVideoPipeline(SDImagePipeline):
         latents = torch.concat(latents, dim=0)
         return latents
     
+    def encode_prompt_batch(self, prompt, clip_skip=1, positive=True):
+        prompt_emb_tmp = []
+        for batch_id in range(0, len(prompt)):
+            prompt_emb = self.prompter.encode_prompt(prompt[batch_id], clip_skip=clip_skip, device=self.device, positive=positive)
+            prompt_emb_tmp.append(prompt_emb)
+        prompt_emb = torch.concat(prompt_emb_tmp, dim=0)
+        return {"encoder_hidden_states": prompt_emb}
 
     @torch.no_grad()
     def __call__(
@@ -167,15 +173,18 @@ class SDVideoPipeline(SDImagePipeline):
         tile_size=64,
         tile_stride=32,
         seed=None,
+        vram_limit_level=0,
         progress_bar_cmd=tqdm,
         progress_bar_st=None,
+        original_width=None,
+        original_height=None,
     ):
         # Tiler parameters, batch size ...
         tiler_kwargs = {"tiled": tiled, "tile_size": tile_size, "tile_stride": tile_stride}
         other_kwargs = {
             "animatediff_batch_size": animatediff_batch_size, "animatediff_stride": animatediff_stride,
             "unet_batch_size": unet_batch_size, "controlnet_batch_size": controlnet_batch_size,
-            "cross_frame_attention": cross_frame_attention,
+            "cross_frame_attention": cross_frame_attention, "vram_limit_level": vram_limit_level,
         }
 
         # Prepare scheduler
@@ -263,5 +272,8 @@ class SDVideoPipeline(SDImagePipeline):
         # Post-process
         if smoother is not None and (num_inference_steps in smoother_progress_ids or -1 in smoother_progress_ids):
             output_frames = smoother(output_frames, original_frames=input_frames)
+
+        if original_width is not None and original_height is not None:
+            output_frames = [center_crop(output_frame, original_height, original_width) for output_frame in output_frames]
 
         return output_frames

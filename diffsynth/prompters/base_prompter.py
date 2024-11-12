@@ -2,7 +2,6 @@ from ..models.model_manager import ModelManager
 import torch
 
 
-
 def tokenize_long_prompt(tokenizer, prompt, max_length=None):
     # Get model_max_length from self.tokenizer
     length = tokenizer.model_max_length if max_length is None else max_length
@@ -35,12 +34,10 @@ def tokenize_long_prompt(tokenizer, prompt, max_length=None):
     return input_ids
 
 
-
 class BasePrompter:
     def __init__(self):
         self.refiners = []
         self.extenders = []
-
 
     def load_prompt_refiners(self, model_manager: ModelManager, refiner_classes=[]):
         for refiner_class in refiner_classes:
@@ -51,7 +48,6 @@ class BasePrompter:
         for extender_class in extender_classes:
             extender = extender_class.from_model_manager(model_manager)
             self.extenders.append(extender)
-
 
     @torch.no_grad()
     def process_prompt(self, prompt, positive=True):

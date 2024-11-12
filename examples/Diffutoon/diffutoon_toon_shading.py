@@ -25,13 +25,14 @@ config = {
             "models/stable_diffusion/aingdiffusion_v12.safetensors",
             "models/AnimateDiff/mm_sd_v15_v2.ckpt",
             "models/ControlNet/control_v11f1e_sd15_tile.pth",
-            "models/ControlNet/control_v11p_sd15_lineart.pth",
-            "models/ControlNet/control_v11p_sd15_softedge.pth",
+            "models/ControlNet/control_v11p_sd15s2_lineart_anime_fp16.safetensors",
             "models/ControlNet/control_v11f1p_sd15_depth.pth",
+            "models/ControlNet/control_v11p_sd15_softedge.pth",
+            "models/RIFE/flownet.pkl"
         ],
         "textual_inversion_folder": "models/textual_inversion",
         "device": "cuda",
-        "lora_list": [],
+        "loras":[],
         "lora_alphas": [],
         "controlnet_units": [
             {
@@ -40,8 +41,8 @@ config = {
                 "scale": 0.3
             },
             {
-                "processor_id": "lineart",
-                "model_path": "models/ControlNet/control_v11p_sd15_lineart.pth",
+                "processor_id": "lineart_anime",
+                "model_path": "models/ControlNet/control_v11p_sd15s2_lineart_anime_fp16.safetensors",
                 "scale": 0.3
             },
             {
@@ -53,7 +54,7 @@ config = {
                 "processor_id": "depth",
                 "model_path": "models/ControlNet/control_v11f1p_sd15_depth.pth",
                 "scale": 0.3
-            }
+            },
         ]
     },
     "data": {
@@ -100,7 +101,7 @@ config = {
             "animatediff_stride": 8,
             "unet_batch_size": 1,
             "controlnet_batch_size": 1,
-            "cross_frame_attention": False,
+            "cross_frame_attention": True,
             "smoother_progress_ids": [-1],
             # The following parameters will be overwritten. You don't need to modify them.
             "input_frames": [],
@@ -112,6 +113,98 @@ config = {
     }
 }
 
+config_XL = {
+    "models": {
+        "model_list": [
+            "models/stable_diffusion_xl/IDillustration互联网插画风模型_v1.0.safetensors",
+            "models/AnimateDiff/mm_sdxl_v10.ckpt",
+            "models/ControlNet/controlnet_union/diffusion_pytorch_model_promax.safetensors",
+            "models/RIFE/flownet.pkl"
+        ],
+        "textual_inversion_folder": "models/textual_inversion",
+        "device": "cuda",
+        "loras":[],
+        "lora_alphas": [],
+        # "controlnet_units":[]
+
+        "controlnet_units": [
+            {
+                "processor_id": "tile",
+                "model_path": "models/ControlNet/controlnet_union/diffusion_pytorch_model_promax.safetensors",
+                "scale": 0.3
+            },
+            {
+                "processor_id": "lineart_anime",
+                "model_path": "models/ControlNet/controlnet_union/diffusion_pytorch_model_promax.safetensors",
+                "scale": 0.3
+            },
+            {
+                "processor_id": "softedge",
+                "model_path": "models/ControlNet/controlnet_union/diffusion_pytorch_model_promax.safetensors",
+                "scale": 0.3
+            },
+            {
+                "processor_id": "depth",
+                "model_path": "models/ControlNet/controlnet_union/diffusion_pytorch_model_promax.safetensors",
+                "scale": 0.3
+            },
+        ]
+    },
+    "data": {
+        "input_frames": {
+            "video_file": "data/examples/diffutoon/input_video.mp4",
+            "image_folder": None,
+            "height": 1536,
+            "width": 1536,
+            "start_frame_id": 0,
+            "end_frame_id": 30
+        },
+        "controlnet_frames": [
+            {
+                "video_file": "data/examples/diffutoon/input_video.mp4",
+                "image_folder": None,
+                "height": 1536,
+                "width": 1536,
+                "start_frame_id": 0,
+                "end_frame_id": 30
+            },
+            {
+                "video_file": "data/examples/diffutoon/input_video.mp4",
+                "image_folder": None,
+                "height": 1536,
+                "width": 1536,
+                "start_frame_id": 0,
+                "end_frame_id": 30
+            }
+        ],
+        "output_folder": "output",
+        "fps": 30
+    },
+    "smoother_configs": [],
+    "pipeline": {
+        "seed": 0,
+        "pipeline_inputs": {
+            "prompt": "best quality, perfect anime illustration, light, a girl is dancing, smile, solo",
+            "negative_prompt": "worst quality, low quality, monochrome, zombie, interlocked fingers, Aissist, cleavage, nsfw,",
+            "cfg_scale": 7.0,
+            "clip_skip": 2,
+            "denoising_strength": 1.0,
+            "num_inference_steps": 10,
+            "animatediff_batch_size": 16,
+            "animatediff_stride": 8,
+            "unet_batch_size": 1,
+            "controlnet_batch_size": 1,
+            "cross_frame_attention": True,
+            "smoother_progress_ids": [-1],
+            # The following parameters will be overwritten. You don't need to modify them.
+            "input_frames": [],
+            "num_frames": 30,
+            "width": 1536,
+            "height": 1536,
+            "controlnet_frames": []
+        }
+    }
+}
 
 if __name__ == "__main__":
     runner = SDVideoPipelineRunner()

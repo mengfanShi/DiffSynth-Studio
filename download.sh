@@ -11,4 +11,3 @@ wget -c -O "models/Annotators/ControlNetHED.pth" "https://huggingface.co/lllyasv
 wget -c -O "models/Annotators/sk_model.pth" "https://huggingface.co/lllyasviel/Annotators/resolve/main/sk_model.pth"
 wget -c -O "models/Annotators/sk_model2.pth" "https://huggingface.co/lllyasviel/Annotators/resolve/main/sk_model2.pth"
 wget -c -O "models/textual_inversion/verybadimagenegative_v1.3.pt" "https://civitai.com/api/download/models/25820?type=Model&format=PickleTensor&size=full&fp=fp16"
-wget -c -O "models/RIFE/flownet.pkl" "https://drive.google.com/file/d/1APIzVeI-4ZZCEuIRE1m6WYfSCaOsi_7_/view?usp=sharing"

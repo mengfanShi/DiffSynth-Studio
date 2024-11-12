@@ -1,5 +1,5 @@
-from examples.Diffutoon.diffutoon_toon_shading import config
-from diffsynth import SDVideoPipelineRunner, SDImagePipelineRunner
+from examples.Diffutoon.diffutoon_toon_shading import config_XL as config
+from diffsynth import SDXLVideoPipelineRunner,SDXLImagePipelineRunner
 from diffsynth.extensions.CUGAN.inference_video import VideoRealWaifuUpScaler
 from diffsynth.extensions.Tagger.tag_images_by_wd14_tagger import get_tagger_tag
 from diffsynth.extensions.SceneDet.scenedet import save_scenes
@@ -33,13 +33,13 @@ def parse_args():
     parser.add_argument("--output_folder", type=str, default="data/toon_video", help="Folder to save the output frames.")
     parser.add_argument("--steps", type=int, default=10, help="Number of inference steps.")
     parser.add_argument("--seed", type=int, default=42, help="seed of generate video.")
-    parser.add_argument("--cfg_scale", type=float, default=3, help="cfg_scale.")
+    parser.add_argument("--cfg_scale", type=float, default=7.0, help="cfg_scale.")
     parser.add_argument("--fps", type=float, default=None, help="fps of generate video.")
-    parser.add_argument("--model_path", type=str, default="models/stable_diffusion/aingdiffusion_v16.safetensors",
+    parser.add_argument("--model_path", type=str, default="models/stable_diffusion_xl/IDillustration互联网插画风模型_v1.0.safetensors",
                         help="Stable Diffusion model path.")
     parser.add_argument("--lora", type=str, nargs='+', help="Lora model path.")
     parser.add_argument("--lora_alpha", type=float, nargs='+', help="Lora alpha.")
-    parser.add_argument("--animatediff", type=str, default="models/AnimateDiff/v3_sd15_mm.ckpt",
+    parser.add_argument("--animatediff", type=str, default="models/AnimateDiff/mm_sdxl_v10.ckpt",
                         help="Animatediff model path.")
     parser.add_argument("--animatediff_size", type=int, default=16, help="Animatediff batch size.")
     parser.add_argument("--animatediff_stride", type=int, default=8, help="Animatediff stride.")
@@ -50,7 +50,7 @@ def parse_args():
     parser.add_argument("--upscale_input", action="store_true", help="whether upscale input video.")
     parser.add_argument("--upscale_output", action="store_true", help="whether upscale output video.")
     parser.add_argument("--use_rife", action="store_true", help="whether use rife smooth.")
-    parser.add_argument("--rife_model", type=str, default="models/RIFE/flownet.pkl")
+    parser.add_argument("--rife_model", type=str, default="models/RIFE/flownet_v3.pkl")
     parser.add_argument("--use_fastblend", action="store_true", help="whether use FastBlend smooth.")
     parser.add_argument("--interpolate", type=int, default=0, help="interpolate times param.")
     parser.add_argument("--trans_first_frame", action="store_true", help="whether transform input video's first frame.")
@@ -74,7 +74,7 @@ def update_config(demo_config, args):
         demo_config["models"]["model_list"][1] = args.animatediff
 
     if os.path.isfile(args.rife_model):
-        demo_config["models"]["model_list"][6] = args.rife_model
+        demo_config["models"]["model_list"][-1] = args.rife_model
 
     if args.lora and args.lora_alpha:
         for lora, alpha in zip(args.lora, args.lora_alpha):
@@ -196,7 +196,7 @@ if __name__ == "__main__":
         if short_video or args.trans_first_frame:
             image_config = {}
             image_config["models"] = copy.deepcopy(demo_config["models"])
-            del image_config["models"]["model_list"][6]
+            del image_config["models"]["model_list"][-1]
             del image_config["models"]["model_list"][1]
             image_config["data"] = {}
             image_config["pipeline"] = {}
@@ -219,7 +219,7 @@ if __name__ == "__main__":
             image_config["pipeline"]["pipeline_inputs"]["denoising_strength"] = args.denoise
 
             print(image_config)
-            image_runner = SDImagePipelineRunner()
+            image_runner = SDXLImagePipelineRunner()
             if image_model_manager is None or image_pipe is None:
                 image_model_manager, image_pipe = image_runner.load_pipeline(**image_config["models"])
             image_gen = image_runner.run_with_pipe(image_model_manager, image_pipe, image_config, out_name=basename)
@@ -270,10 +270,9 @@ if __name__ == "__main__":
             demo_config["data"]["output_folder"] = output_dir
             demo_config["data"]["fps"] = fps
             demo_config["pipeline"]["pipeline_inputs"]["prompt"] = tag
-            demo_config["pipeline"]["pipeline_inputs"]["vram_limit_level"] = 1
 
             print(demo_config)
-            video_runner = SDVideoPipelineRunner()
+            video_runner = SDXLVideoPipelineRunner()
             if video_model_manager is None or video_pipe is None:
                 video_model_manager, video_pipe = video_runner.load_pipeline(**demo_config["models"])
             video_runner.run_with_pipe(video_model_manager, video_pipe, demo_config, out_name=basename, ext=ext)

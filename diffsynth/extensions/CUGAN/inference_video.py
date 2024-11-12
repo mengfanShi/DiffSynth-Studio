@@ -6,6 +6,7 @@ from moviepy.editor import VideoFileClip
 from .upcunet_v3 import RealWaifuUpScaler
 from time import time as ttime, sleep
 from PIL import Image
+import numpy as np
 
 
 class UpScalerMT(threading.Thread):
@@ -81,7 +82,7 @@ class VideoRealWaifuUpScaler(object):
         print("Super Resolution Done. time cost: %.3f" % (t1 - t0))
         return res
 
-    def process_video(self, inp_path, opt_path, out_name="output_super"):
+    def process_video(self, inp_path, opt_path, out_name="output_super", out_width=None, out_height=None):
         suffix = inp_path.split(".")[-1]
         os.makedirs(opt_path, exist_ok=True)
         output = os.path.join(opt_path, f"{out_name}.{suffix}")
@@ -92,12 +93,18 @@ class VideoRealWaifuUpScaler(object):
         fps = objVideoreader.reader.fps
         if_audio = objVideoreader.audio
 
+        resize_frame = True
+        if out_height is None or out_width is None:
+            out_width = w * self.scale
+            out_height = h * self.scale
+            resize_frame = False
+
         if if_audio:
             tmp_audio_path = os.path.join(opt_path, "audio.m4a")
             objVideoreader.audio.write_audiofile(tmp_audio_path, codec="aac")
             writer = FFMPEG_VideoWriter(
                 output,
-                (w * self.scale, h * self.scale),
+                (out_width, out_height),
                 fps,
                 ffmpeg_params=self.encode_params,
                 audiofile=tmp_audio_path,
@@ -105,7 +112,7 @@ class VideoRealWaifuUpScaler(object):
         else:
             writer = FFMPEG_VideoWriter(
                 output,
-                (w * self.scale, h * self.scale),
+                (out_width, out_height),
                 fps,
                 ffmpeg_params=self.encode_params,
             )
@@ -113,6 +120,12 @@ class VideoRealWaifuUpScaler(object):
         t0 = ttime()
         for frame in objVideoreader.iter_frames():
             process_frame = model(frame, self.tile, self.cache_mode, self.alpha)
+
+            if resize_frame:
+                pil_image = Image.fromarray(process_frame)
+                resized_image = pil_image.resize((out_width, out_height))
+                process_frame = np.array(resized_image)
+
             writer.write_frame(process_frame)
 
         writer.close()

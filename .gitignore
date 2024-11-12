@@ -34,6 +34,7 @@ vendor/
 pkg/
 models/*
 data/*
+tools/
 
 # Environment variables
 .env
@@ -46,8 +47,4 @@ data/*
 *.bak
 *.old
 *.orig
-lorademo.py
-loraserver.py
-loratest.py
-server.py
-test.py
+*.sh

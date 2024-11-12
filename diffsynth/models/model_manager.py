@@ -43,14 +43,14 @@ from .flux_vae import FluxVAEEncoder, FluxVAEDecoder
 from .cog_vae import CogVAEEncoder, CogVAEDecoder
 from .cog_dit import CogDiT
 
-from ..extensions.RIFE.flownet import IFNet
+from ..extensions.RIFE import IFNet_v1, IFNet_v2, IFNet_v3
 from ..extensions.ESRGAN import RRDBNet
 
-from ..configs.model_config import model_loader_configs, huggingface_model_loader_configs, patch_model_loader_configs
+from ..configs.model_config import model_loader_configs, huggingface_model_loader_configs, patch_model_loader_configs, model_kwargs_loader_configs
 from .utils import load_state_dict, init_weights_on_device, hash_state_dict_keys, split_state_dict_with_prefix
 
 
-def load_model_from_single_file(state_dict, model_names, model_classes, model_resource, torch_dtype, device):
+def load_model_from_single_file(state_dict, model_names, model_classes, model_resource, torch_dtype, device, kwargs=None):
     loaded_model_names, loaded_models = [], []
     for model_name, model_class in zip(model_names, model_classes):
         print(f"    model_name: {model_name} model_class: {model_class.__name__}")
@@ -64,6 +64,8 @@ def load_model_from_single_file(state_dict, model_names, model_classes, model_re
             print(f"        This model is initialized with extra kwargs: {extra_kwargs}")
         else:
             model_state_dict, extra_kwargs = state_dict_results, {}
+        if kwargs is not None:
+            extra_kwargs.update(kwargs)
         torch_dtype = torch.float32 if extra_kwargs.get("upcast_to_float32", False) else torch_dtype
         with init_weights_on_device():
             model= model_class(**extra_kwargs)
@@ -144,12 +146,10 @@ class ModelDetectorFromSingleFile:
         for metadata in model_loader_configs:
             self.add_model_metadata(*metadata)
 
-
     def add_model_metadata(self, keys_hash, keys_hash_with_shape, model_names, model_classes, model_resource):
         self.keys_hash_with_shape_dict[keys_hash_with_shape] = (model_names, model_classes, model_resource)
         if keys_hash is not None:
             self.keys_hash_dict[keys_hash] = (model_names, model_classes, model_resource)
-
 
     def match(self, file_path="", state_dict={}):
         if os.path.isdir(file_path):
@@ -186,6 +186,36 @@ class ModelDetectorFromSingleFile:
 
         return loaded_model_names, loaded_models
 
+
+class ModelDetectorFromSingleFilewithkwarg:
+    def __init__(self, model_loader_configs=[]):
+        self.keys_hash_with_shape_dict = {}
+        
+        for metadata in model_loader_configs:
+            self.add_model_metadata(*metadata)
+
+    def add_model_metadata(self, keys_hash_with_shape, model_names, model_classes, model_resource, extra_kwargs):
+        self.keys_hash_with_shape_dict[keys_hash_with_shape] = (model_names, model_classes, model_resource, extra_kwargs)
+        
+    def match(self, file_path="", state_dict={}):
+        if os.path.isdir(file_path):
+            return False
+        if len(state_dict) == 0:
+            state_dict = load_state_dict(file_path)
+        keys_hash_with_shape = hash_state_dict_keys(state_dict, with_shape=True)
+        if keys_hash_with_shape in self.keys_hash_with_shape_dict:
+            return True
+        return False
+
+    def load(self, file_path="", state_dict={}, device="cuda", torch_dtype=torch.float16, **kwargs):
+        if len(state_dict) == 0:
+            state_dict = load_state_dict(file_path)
+
+        keys_hash_with_shape = hash_state_dict_keys(state_dict, with_shape=True)
+        if keys_hash_with_shape in self.keys_hash_with_shape_dict:
+            model_names, model_classes, model_resource, extra_kwargs = self.keys_hash_with_shape_dict[keys_hash_with_shape]
+            loaded_model_names, loaded_models = load_model_from_single_file(state_dict, model_names, model_classes, model_resource, torch_dtype, device, kwargs=extra_kwargs)
+            return loaded_model_names, loaded_models
 
 
 class ModelDetectorFromSplitedSingleFile(ModelDetectorFromSingleFile):
@@ -231,10 +261,8 @@ class ModelDetectorFromHuggingfaceFolder:
         for metadata in model_loader_configs:
             self.add_model_metadata(*metadata)
 
-
     def add_model_metadata(self, architecture, huggingface_lib, model_name, redirected_architecture):
         self.architecture_dict[architecture] = (huggingface_lib, model_name, redirected_architecture)
-
 
     def match(self, file_path="", state_dict={}):
         if os.path.isfile(file_path):
@@ -247,7 +275,6 @@ class ModelDetectorFromHuggingfaceFolder:
         if "architectures" not in config and "_class_name" not in config:
             return False
         return True
-
 
     def load(self, file_path="", state_dict={}, device="cuda", torch_dtype=torch.float16, **kwargs):
         with open(os.path.join(file_path, "config.json"), "r") as f:
@@ -265,17 +292,14 @@ class ModelDetectorFromHuggingfaceFolder:
         return loaded_model_names, loaded_models
 
 
-
 class ModelDetectorFromPatchedSingleFile:
     def __init__(self, model_loader_configs=[]):
         self.keys_hash_with_shape_dict = {}
         for metadata in model_loader_configs:
             self.add_model_metadata(*metadata)
 
-
     def add_model_metadata(self, keys_hash_with_shape, model_name, model_class, extra_kwargs):
         self.keys_hash_with_shape_dict[keys_hash_with_shape] = (model_name, model_class, extra_kwargs)
-
 
     def match(self, file_path="", state_dict={}):
         if os.path.isdir(file_path):
@@ -286,7 +310,6 @@ class ModelDetectorFromPatchedSingleFile:
         if keys_hash_with_shape in self.keys_hash_with_shape_dict:
             return True
         return False
-
 
     def load(self, file_path="", state_dict={}, device="cuda", torch_dtype=torch.float16, model_manager=None, **kwargs):
         if len(state_dict) == 0:
@@ -302,7 +325,6 @@ class ModelDetectorFromPatchedSingleFile:
             loaded_model_names += loaded_model_names_
             loaded_models += loaded_models_
         return loaded_model_names, loaded_models
-
 
 
 class ModelManager:
@@ -322,12 +344,12 @@ class ModelManager:
         downloaded_files = download_models(model_id_list, downloading_priority) if len(model_id_list) > 0 else []
         self.model_detector = [
             ModelDetectorFromSingleFile(model_loader_configs),
+            ModelDetectorFromSingleFilewithkwarg(model_kwargs_loader_configs),
             ModelDetectorFromSplitedSingleFile(model_loader_configs),
             ModelDetectorFromHuggingfaceFolder(huggingface_model_loader_configs),
             ModelDetectorFromPatchedSingleFile(patch_model_loader_configs),
         ]
         self.load_models(downloaded_files + file_path_list)
-
 
     def load_model_from_single_file(self, file_path="", state_dict={}, model_names=[], model_classes=[], model_resource=None):
         print(f"Loading models from file: {file_path}")
@@ -340,7 +362,6 @@ class ModelManager:
             self.model_name.append(model_name)
         print(f"    The following models are loaded: {model_names}.")
 
-
     def load_model_from_huggingface_folder(self, file_path="", model_names=[], model_classes=[]):
         print(f"Loading models from folder: {file_path}")
         model_names, models = load_model_from_huggingface_folder(file_path, model_names, model_classes, self.torch_dtype, self.device)
@@ -349,7 +370,6 @@ class ModelManager:
             self.model_path.append(file_path)
             self.model_name.append(model_name)
         print(f"    The following models are loaded: {model_names}.")
-
 
     def load_patch_model_from_single_file(self, file_path="", state_dict={}, model_names=[], model_classes=[], extra_kwargs={}):
         print(f"Loading patch models from file: {file_path}")
@@ -360,7 +380,6 @@ class ModelManager:
             self.model_path.append(file_path)
             self.model_name.append(model_name)
         print(f"    The following patched models are loaded: {model_names}.")
-
 
     def load_lora(self, file_path="", state_dict={}, lora_alpha=1.0):
         print(f"Loading LoRA models from file: {file_path}")
@@ -375,8 +394,7 @@ class ModelManager:
                     lora.load(model, state_dict, lora_prefix, alpha=lora_alpha, model_resource=model_resource)
                     break
 
-
-    def load_model(self, file_path, model_names=None, device=None, torch_dtype=None):
+    def load_model(self, file_path, model_names=None, device=None, torch_dtype=None, lora_alphas=[]):
         print(f"Loading models from: {file_path}")
         if device is None: device = self.device
         if torch_dtype is None: torch_dtype = self.torch_dtype
@@ -384,6 +402,7 @@ class ModelManager:
             state_dict = load_state_dict(file_path)
         else:
             state_dict = None
+      
         for model_detector in self.model_detector:
             if model_detector.match(file_path, state_dict):
                 model_names, models = model_detector.load(
@@ -397,14 +416,12 @@ class ModelManager:
                     self.model_name.append(model_name)
                 print(f"    The following models are loaded: {model_names}.")
                 break
-        else:
-            print(f"    We cannot detect the model type. No models are loaded.")
-
+            else:
+                print(f"    We cannot detect the model type. No models are loaded.")
 
     def load_models(self, file_path_list, model_names=None, device=None, torch_dtype=None):
         for file_path in file_path_list:
             self.load_model(file_path, model_names, device=device, torch_dtype=torch_dtype)
-
 
     def fetch_model(self, model_name, file_path=None, require_model_path=False):
         fetched_models = []
@@ -426,7 +443,6 @@ class ModelManager:
             return fetched_models[0], fetched_model_paths[0]
         else:
             return fetched_models[0]
-
 
     def to(self, device):
         for model in self.model:

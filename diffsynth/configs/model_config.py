@@ -18,7 +18,7 @@ from ..models.sd3_vae_encoder import SD3VAEEncoder
 from ..models.sd_controlnet import SDControlNet
 from ..models.sdxl_controlnet import SDXLControlNetUnion
 
-from ..models.sd_motion import SDMotionModel
+from ..models.sd_motion import SDMotionModel, SDMotionModel_V3
 from ..models.sdxl_motion import SDXLMotionModel
 
 from ..models.svd_image_encoder import SVDImageEncoder
@@ -40,7 +40,7 @@ from ..models.flux_controlnet import FluxControlNet
 from ..models.cog_vae import CogVAEEncoder, CogVAEDecoder
 from ..models.cog_dit import CogDiT
 
-from ..extensions.RIFE.flownet import IFNet
+from ..extensions.RIFE import IFNet_v1, IFNet_v2, IFNet_v3
 from ..extensions.ESRGAN import RRDBNet
 
 
@@ -66,11 +66,13 @@ model_loader_configs = [
     (None, "d9e0290829ba8d98e28e1a2b1407db4a", ["sd3_text_encoder_1", "sd3_text_encoder_2", "sd3_text_encoder_3", "sd3_dit", "sd3_vae_encoder", "sd3_vae_decoder"], [SD3TextEncoder1, SD3TextEncoder2, SD3TextEncoder3, SD3DiT, SD3VAEEncoder, SD3VAEDecoder], "civitai"),
     (None, "5072d0b24e406b49507abe861cf97691", ["sd3_text_encoder_3"], [SD3TextEncoder3], "civitai"),
     (None, "4cf64a799d04260df438c6f33c9a047e", ["sdxl_text_encoder", "sdxl_text_encoder_2", "sdxl_unet", "sdxl_vae_decoder", "sdxl_vae_encoder"], [SDXLTextEncoder, SDXLTextEncoder2, SDXLUNet, SDXLVAEDecoder, SDXLVAEEncoder], "civitai"),
+    (None, "d34167ecd389f17d58f6c907b65173fa", ["sdxl_text_encoder", "sdxl_text_encoder_2", "sdxl_unet", "sdxl_vae_decoder", "sdxl_vae_encoder"], [SDXLTextEncoder, SDXLTextEncoder2, SDXLUNet, SDXLVAEDecoder, SDXLVAEEncoder], "civitai"),
     (None, "d9b008a867c498ab12ad24042eff8e3f", ["sdxl_text_encoder", "sdxl_text_encoder_2", "sdxl_unet", "sdxl_vae_decoder", "sdxl_vae_encoder"], [SDXLTextEncoder, SDXLTextEncoder2, SDXLUNet, SDXLVAEDecoder, SDXLVAEEncoder], "civitai"), # SDXL-Turbo
     (None, "025bb7452e531a3853d951d77c63f032", ["sdxl_text_encoder", "sdxl_text_encoder_2"], [SDXLTextEncoder, SDXLTextEncoder2], "civitai"),
     (None, "298997b403a4245c04102c9f36aac348", ["sdxl_unet"], [SDXLUNet], "civitai"),
     (None, "2a07abce74b4bdc696b76254ab474da6", ["svd_image_encoder", "svd_unet", "svd_vae_decoder", "svd_vae_encoder"], [SVDImageEncoder, SVDUNet, SVDVAEDecoder, SVDVAEEncoder], "civitai"),
-    (None, "d849e3127a4314fae1980b98f9ce9351", ["sd_motion_modules"], [SDMotionModel], "civitai"),
+    (None, "c96a285a6888465f87de22a984d049fb", ["sd_motion_modules"], [SDMotionModel], "civitai"),
+    (None, "d849e3127a4314fae1980b98f9ce9351", ["sd_motion_modules"], [SDMotionModel_V3], "civitai"),
     (None, "72907b92caed19bdb2adb89aa4063fe2", ["sdxl_motion_modules"], [SDXLMotionModel], "civitai"),
     (None, "31d2d9614fba60511fc9bf2604aa01f7", ["sdxl_controlnet"], [SDXLControlNetUnion], "diffusers"),
     (None, "94eefa3dac9cec93cb1ebaf1747d7b78", ["flux_text_encoder_1"], [FluxTextEncoder1], "diffusers"),
@@ -79,13 +81,20 @@ model_loader_configs = [
     (None, "a29710fea6dddb0314663ee823598e50", ["flux_dit"], [FluxDiT], "civitai"),
     (None, "57b02550baab820169365b3ee3afa2c9", ["flux_dit"], [FluxDiT], "civitai"),
     (None, "280189ee084bca10f70907bf6ce1649d", ["cog_vae_encoder", "cog_vae_decoder"], [CogVAEEncoder, CogVAEDecoder], "diffusers"),
-    (None, "77e1821e5816ca5aba7e884f48f5acb0", ["rife"], [IFNet], "civitai"),
+    (None, "9b9313d104ac4df27991352fec013fd4", ["rife"], [IFNet_v1], "civitai"),
+    (None, "77e1821e5816ca5aba7e884f48f5acb0", ["rife"], [IFNet_v2], "civitai"),
+    (None, "47ac734bfc54bc2f75ff43e8e016588d", ["rife"], [IFNet_v3], "civitai"),
     (None, "6b7116078c4170bfbeaedc8fe71f6649", ["esrgan"], [RRDBNet], "civitai"),
     (None, "78d18b9101345ff695f312e7e62538c0", ["flux_controlnet"], [FluxControlNet], "diffusers"),
     (None, "b001c89139b5f053c715fe772362dd2a", ["flux_controlnet"], [FluxControlNet], "diffusers"),
     (None, "52357cb26250681367488a8954c271e8", ["flux_controlnet"], [FluxControlNet], "diffusers"),
     (None, "0cfd1740758423a2a854d67c136d1e8c", ["flux_controlnet"], [FluxControlNet], "diffusers"),
 ]
+
+model_kwargs_loader_configs = [
+        ("87cdb90361d5ebabf28fca6acf6e8018", ["sd_motion_modules"], [SDMotionModel_V3], "civitai", {"max_position_embeddings": 64}),
+]
+
 huggingface_model_loader_configs = [
     # These configs are provided for detecting model type automatically.
     # The format is (architecture_in_huggingface_config, huggingface_lib, model_name, redirected_architecture)
@@ -167,7 +176,7 @@ preset_models_on_huggingface = {
     ],
     # AnimateDiff
     "AnimateDiff_v3": [
-        ("guoyww/animatediff", "mm_sd_v15_v3.ckpt", "models/AnimateDiff"),
+        ("guoyww/animatediff", "v3_sd15_mm.ckpt", "models/AnimateDiff"),
     ],
     "AnimateDiff_xl_beta": [
         ("guoyww/animatediff", "mm_sdxl_v10_beta.ckpt", "models/AnimateDiff"),

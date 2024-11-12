@@ -321,7 +321,7 @@ class SDUNet(torch.nn.Module):
         self.conv_act = torch.nn.SiLU()
         self.conv_out = torch.nn.Conv2d(320, 4, kernel_size=3, padding=1)
 
-    def forward(self, sample, timestep, encoder_hidden_states, **kwargs):
+    def forward(self, sample, timestep, encoder_hidden_states, use_gradient_checkpointing=False, **kwargs):
         # 1. time
         time_emb = self.time_proj(timestep).to(sample.dtype)
         time_emb = self.time_embedding(time_emb)
@@ -332,8 +332,17 @@ class SDUNet(torch.nn.Module):
         res_stack = [hidden_states]
 
         # 3. blocks
+        def create_custom_forward(module):
+            def custom_forward(*inputs):
+                return module(*inputs)
+            return custom_forward
+
         for i, block in enumerate(self.blocks):
-            hidden_states, time_emb, text_emb, res_stack = block(hidden_states, time_emb, text_emb, res_stack)
+            if self.training and use_gradient_checkpointing and not (isinstance(block, PushBlock) or isinstance(block, PopBlock)):
+                hidden_states, time_emb, text_emb, res_stack = torch.utils.checkpoint.checkpoint(
+                    create_custom_forward(block), hidden_states, time_emb, text_emb, res_stack)
+            else:
+                hidden_states, time_emb, text_emb, res_stack = block(hidden_states, time_emb, text_emb, res_stack)
         
         # 4. output
         hidden_states = self.conv_norm_out(hidden_states)
@@ -357,7 +366,7 @@ class SDUNetStateDictConverter:
             'ResnetBlock', 'AttentionBlock', 'PushBlock', 'ResnetBlock', 'AttentionBlock', 'PushBlock', 'DownSampler', 'PushBlock',
             'ResnetBlock', 'AttentionBlock', 'PushBlock', 'ResnetBlock', 'AttentionBlock', 'PushBlock', 'DownSampler', 'PushBlock',
             'ResnetBlock', 'AttentionBlock', 'PushBlock', 'ResnetBlock', 'AttentionBlock', 'PushBlock', 'DownSampler', 'PushBlock',
-            'ResnetBlock', 'PushBlock', 'ResnetBlock', 'PushBlock', 
+            'ResnetBlock', 'PushBlock', 'ResnetBlock', 'PushBlock',
             'ResnetBlock', 'AttentionBlock', 'ResnetBlock',
             'PopBlock', 'ResnetBlock', 'PopBlock', 'ResnetBlock', 'PopBlock', 'ResnetBlock', 'UpSampler',
             'PopBlock', 'ResnetBlock', 'AttentionBlock', 'PopBlock', 'ResnetBlock', 'AttentionBlock', 'PopBlock', 'ResnetBlock', 'AttentionBlock', 'UpSampler',
@@ -408,7 +417,7 @@ class SDUNetStateDictConverter:
                 param = param.squeeze()
             state_dict_[rename_dict[name]] = param
         return state_dict_
-    
+
     def from_civitai(self, state_dict):
         rename_dict = {
             "model.diffusion_model.input_blocks.0.0.bias": "conv_in.bias",
