@@ -92,7 +92,7 @@ model_loader_configs = [
 ]
 
 model_kwargs_loader_configs = [
-        ("87cdb90361d5ebabf28fca6acf6e8018", ["sd_motion_modules"], [SDMotionModel_V3], "civitai", {"max_position_embeddings": 64}),
+    ("87cdb90361d5ebabf28fca6acf6e8018", ["sd_motion_modules"], [SDMotionModel_V3], "civitai", {"max_position_embeddings": 64}),
 ]
 
 huggingface_model_loader_configs = [
