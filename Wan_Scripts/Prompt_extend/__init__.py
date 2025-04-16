@@ -1,0 +1,2 @@
+from .prompt_extend import QwenPromptExpander
+from .config import VL_EN_DIGITAL_HUMAN_PROMPT

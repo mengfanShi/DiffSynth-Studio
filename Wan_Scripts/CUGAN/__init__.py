@@ -1,0 +1,1 @@
+from .inference_video import VideoRealWaifuUpScaler
